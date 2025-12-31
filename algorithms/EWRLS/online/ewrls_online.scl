@@ -1,0 +1,604 @@
+﻿FUNCTION "MatFilled" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      val : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[0.."n", 0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+   END_VAR
+
+
+BEGIN
+	FOR #i := 0 TO "n" DO
+	    FOR #j := 0 TO "n" DO
+	        #C[#i, #j] := #val;
+	    END_FOR;
+	END_FOR;
+	
+END_FUNCTION
+
+DATA_BLOCK "Db_1"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      U : Array[0.."M"] of Real;
+      Y : Array[0.."M"] of Real;
+   END_VAR
+
+
+BEGIN
+
+END_DATA_BLOCK
+
+FUNCTION "MatIdentity" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      val : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[0.."n", 0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+   END_VAR
+
+
+BEGIN
+	"MatFilled"(val := 0.0,
+	            C => #C);
+	FOR #i := 0 TO "n" DO
+	    #C[#i, #i] := #val;
+	END_FOR;
+	
+END_FUNCTION
+
+DATA_BLOCK "Db_ewrls"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      eps : Real;
+      Phi : Array[0.."n"] of Real;
+      K : Array[0.."n"] of Real;
+      P : Array[0.."n", 0.."n"] of Real;
+      Theta : Array[0.."M", 0.."n"] of Real;
+      Theta_i : Array[0.."n"] of Real;
+   END_VAR
+
+
+BEGIN
+
+END_DATA_BLOCK
+
+FUNCTION "VecFilled" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      val : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+   END_VAR
+
+
+BEGIN
+	FOR #i := 0 TO "n" DO
+	    #C[#i] := #val;
+	END_FOR;
+	
+END_FUNCTION
+
+FUNCTION "MulVecRowVecCol" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[0.."n"] of Real;
+      B : Array[0.."n"] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      s : Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+   END_VAR
+
+
+BEGIN
+	#s := 0.0;
+	FOR #i := 0 TO "n" DO
+	    #s := #s + #A[#i] * #B[#i];
+	END_FOR;
+	
+END_FUNCTION
+
+FUNCTION_BLOCK "ewrls_initialization"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      c : Real;
+   END_VAR
+
+
+BEGIN
+	"lambda" := 1.00; // forgetting factor (=1 means no forgetting)
+	#c := 1_000_000; //"large number" to initialize P
+	"MatIdentity"(val := #c,
+	              C => "Db_ewrls".P);
+	// Pad input and output vectors with "n" zeros at the beginning
+	"i" := 0;
+	"start_i" := MAX(IN1 := "a", IN2 := "b");
+	"VecFilled"(val := 0.0,
+	            C => "Db_ewrls".Theta["i"]);
+	"initEwrls" := FALSE;
+	
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK "array_initialization"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      j : DInt;
+   END_VAR
+
+
+BEGIN
+	FOR #j := 0 TO "M" DO
+	    "Db_1".U[0] := 0;
+	    "Db_1".Y[0] := 0;
+	END_FOR;
+	
+	"initArrays" := FALSE;
+	
+END_FUNCTION_BLOCK
+
+FUNCTION "MatDivVal" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[0.."n", 0.."n"] of Real;
+      val : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[0.."n", 0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+   END_VAR
+
+
+BEGIN
+	FOR #i := 0 TO "n" DO
+	    FOR #j := 0 TO "n" DO
+	        #C[#i, #j] := #A[#i, #j] / #val;
+	    END_FOR;
+	END_FOR;
+	
+END_FUNCTION
+
+FUNCTION "MulMatMat" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[0.."n", 0.."n"] of Real;
+      B : Array[0.."n", 0.."n"] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[0.."n", 0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      k : DInt;
+   END_VAR
+
+
+BEGIN
+	"MatFilled"(val := 0,
+	            C => #C);
+	
+	FOR #i := 0 TO "n" DO
+	    FOR #j := 0 TO "n" DO
+	        FOR #k := 0 TO "n" DO
+	            #C[#i, #j] := #C[#i, #j] + #A[#i, #k] * #B[#k, #j];
+	        END_FOR;
+	    END_FOR;
+	END_FOR;
+	
+END_FUNCTION
+
+FUNCTION "MulMatVecCol" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[0.."n", 0.."n"] of Real;
+      B : Array[0.."n"] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      k : DInt;
+   END_VAR
+
+
+BEGIN
+	"VecFilled"(val := 0.0,
+	            C => #C);
+	
+	FOR #i := 0 TO "n" DO
+	    FOR #j := 0 TO "n" DO
+	        #C[#i] := #C[#i] + #A[#i, #j] * #B[#j];
+	    END_FOR;
+	END_FOR;
+	
+END_FUNCTION
+
+FUNCTION "MulVecColVecRow" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[0.."n"] of Real;
+      B : Array[0.."n"] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[0.."n", 0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+   END_VAR
+
+
+BEGIN
+	FOR #i := 0 TO "n" DO
+	    FOR #j := 0 TO "n" DO
+	        #C[#i, #j] := #A[#i] * #B[#j];
+	    END_FOR;
+	END_FOR;
+	
+END_FUNCTION
+
+FUNCTION "SubMatMat" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[0.."n", 0.."n"] of Real;
+      B : Array[0.."n", 0.."n"] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[0.."n", 0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+   END_VAR
+
+
+BEGIN
+	FOR #i := 0 TO "n" DO
+	    FOR #j := 0 TO "n" DO
+	        #C[#i, #j] := #A[#i, #j] - #B[#i, #j];
+	    END_FOR;
+	END_FOR;
+	
+END_FUNCTION
+
+FUNCTION "VecDivVal" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[0.."n"] of Real;
+      val : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+   END_VAR
+
+
+BEGIN
+	FOR #i := 0 TO "n" DO
+	    #C[#i] := #A[#i] / #val;
+	END_FOR;
+	
+END_FUNCTION
+
+DATA_BLOCK "array_initialization_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"array_initialization"
+
+BEGIN
+
+END_DATA_BLOCK
+
+FUNCTION "EwrlsSetEps" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      Phi : Array[0.."n"] of Real;
+      Theta : Array[0.."n"] of Real;
+   END_VAR
+
+   VAR_IN_OUT 
+      eps : Real;
+   END_VAR
+
+   VAR_TEMP 
+      j : DInt;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	// Calculate residual error: eps(i) = y(i) - Phi(i)' * Theta(i-1)
+	#eps := "Db_1".Y["i"];
+	FOR #j := 0 TO "n" DO
+	    #eps := #eps - #Phi[#j] * #Theta[#j];
+	END_FOR;
+	
+END_FUNCTION
+
+FUNCTION "EwrlsSetTheta" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      K : Array[0.."n"] of Real;
+      eps : Real;
+   END_VAR
+
+   VAR_IN_OUT 
+      Theta : Array[0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      j : DInt;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	// Calculate parameter vector: Theta(i) = Theta(i-1) + K(i) * eps(i)
+	FOR #j := 0 TO "n" DO
+	    #Theta[#j] := #Theta[#j] + #K[#j] * #eps;
+	END_FOR;
+	
+END_FUNCTION
+
+FUNCTION "EwrlsSetPhi" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_OUTPUT 
+      Phi : Array[0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      j : DInt;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	// Set values inside regression vector: Phi(i) = [y(i-1) ... y(i-a+1) u(i-1) ... u(i-b+1)]
+	FOR #j := 0 TO "a" - 1 DO
+	    #Phi[#j] := "Db_1".Y["i" - #j - 1];
+	END_FOR;
+	FOR #j := "a" TO "n" DO
+	    #Phi[#j] := "Db_1".U["i" + "a" - #j - 1];
+	END_FOR;
+	
+END_FUNCTION
+
+FUNCTION "EwrlsSetP" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      K : Array[0.."n"] of Real;
+      Phi : Array[0.."n"] of Real;
+      lambda : Real;
+   END_VAR
+
+   VAR_IN_OUT 
+      P : Array[0.."n", 0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      Mat1 : Array[0.."n", 0.."n"] of Real;
+      Mat2 : Array[0.."n", 0.."n"] of Real;
+      Mat3 : Array[0.."n", 0.."n"] of Real;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	// Calculate P: P(i) = (P(i-1) - K(i) * Phi(i)' * P(i-1)) / lambda
+	"MulVecColVecRow"(A := #K,
+	                  B := #Phi,
+	                  C => #Mat1);
+	"MulMatMat"(A := #Mat1,
+	            B := #P,
+	            C => #Mat2);
+	"SubMatMat"(A := #P,
+	            B := #Mat2,
+	            C => #Mat3);
+	"MatDivVal"(A := #Mat3,
+	            val := #lambda,
+	            C => #P);
+	
+END_FUNCTION
+
+FUNCTION "EwrlsSetK" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      P : Array[0.."n", 0.."n"] of Real;
+      Phi : Array[0.."n"] of Real;
+      lambda : Real;
+   END_VAR
+
+   VAR_IN_OUT 
+      K : Array[0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      Vec1 : Array[0.."n"] of Real;
+      div : Real;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	// Calculate K: K(i) = (P(i-1) * Phi(i)) / (lambda + Phi(i)' * P(i-1) * Phi(i))
+	"MulMatVecCol"(A := #P,
+	               B := #Phi,
+	               C => #Vec1);
+	"MulVecRowVecCol"(A := #Phi,
+	                  B := #Vec1,
+	                  s => #div);
+	#div := #div + #lambda;
+	"VecDivVal"(A := #Vec1,
+	            val := #div,
+	            C => #K);
+	
+END_FUNCTION
+
+FUNCTION "ShiftAndAdd" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      u : Real;
+      y : Real;
+   END_VAR
+
+   VAR_IN_OUT 
+      Vec : Array[0.."n"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      j : DInt;
+   END_VAR
+
+
+BEGIN
+	// Shift past values
+	FOR #j := "a" - 1 TO 1 BY -1 DO
+	    #Vec[#j] := #Vec[#j - 1];
+	END_FOR;
+	FOR #j := "n" TO "a" - 1 BY -1 DO
+	    #Vec[#j] := #Vec[#j - 1];
+	END_FOR;
+	// Add new values
+	#Vec[0] := #y;
+	#Vec["a"] := #u;
+	
+END_FUNCTION
+
+DATA_BLOCK "ewrls_initialization_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"ewrls_initialization"
+
+BEGIN
+
+END_DATA_BLOCK
+
+FUNCTION_BLOCK "ewrls"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR 
+      eps : Real;
+      Phi : Array[0.."n"] of Real;
+      K : Array[0.."n"] of Real;
+      P : Array[0.."n", 0.."n"] of Real;
+      Theta : Array[0.."n"] of Real;
+      lambda : Real;
+   END_VAR
+
+   VAR_TEMP 
+      j : DInt;
+      div : Real;
+      Vec1 : Array[0.."n"] of Real;
+      Mat1 : Array[0.."n", 0.."n"] of Real;
+      Mat2 : Array[0.."n", 0.."n"] of Real;
+      Mat3 : Array[0.."n", 0.."n"] of Real;
+      status : Int;
+      time0 {InstructionName := 'DTL'; LibVersion := '1.0'} : DTL;
+      time1 {InstructionName := 'DTL'; LibVersion := '1.0'} : DTL;
+      "dT" : UDInt;
+   END_VAR
+
+
+BEGIN
+	// At the end, the coefficients will be in "Db_1".Theta
+	// does approx 117-118 iterations per default cycle (not scheduled)
+	WHILE "i" <= "M" DO
+	    #status := RD_LOC_T(#time0);
+	    // Set values inside regression vector: Phi(i) = [y(i-1) ... y(i-a+1) u(i-1) ... u(i-b+1)]
+	    "EwrlsSetPhi"(Phi => #Phi);
+	    // Calculate residual error: eps(i) = y(i) - Phi(i)' * Theta(i-1)
+	    "EwrlsSetEps"(Phi := #Phi,
+	                  Theta := #Theta,
+	                  eps := #eps);
+	    // Calculate K: K(i) = (P(i-1) * Phi(i)) / (lambda + Phi(i)' * P(i-1) * Phi(i))
+	    "EwrlsSetK"(P := #P,
+	                Phi := #Phi,
+	                lambda := #lambda,
+	                K := #K);
+	    // Calculate parameter vector: Theta(i) = Theta(i-1) + K(i) * eps(i)
+	    "EwrlsSetTheta"(K := #K,
+	                    eps := #eps,
+	                    Theta := #Theta);
+	    // Calculate P: P(i) = (P(i-1) - K(i) * Phi(i)' * P(i-1)) / lambda
+	    "EwrlsSetP"(K := #K,
+	                Phi := #Phi,
+	                lambda := #lambda,
+	                P := #P);
+	    #status := RD_LOC_T(#time1);
+	    IF #time1.SECOND = #time0.SECOND + 1 THEN
+	        #dT := 1_000_000_000 + #time1.NANOSECOND - #time0.NANOSECOND;
+	    ELSIF #time1.SECOND = #time0.SECOND THEN
+	        #dT := #time1.NANOSECOND - #time0.NANOSECOND;
+	    END_IF;
+	    "i" := "i" + 1;
+	END_WHILE;
+	
+END_FUNCTION_BLOCK
+

@@ -1,0 +1,39 @@
+FUNCTION_BLOCK FB_GaussRandom
+VAR_INPUT
+    Mean     : REAL := 0.0;   // Średnia (μ)
+    Variance : REAL := 1.0;   // Wariancja (σ^2)
+END_VAR
+VAR_OUTPUT
+    RandVal  : REAL;          // Wynik ~ N(Mean, Variance)
+END_VAR
+VAR_IN_OUT
+    Seed     : DINT;          // Ziarno generatora
+END_VAR
+VAR_TEMP
+    U1, U2   : REAL;
+    Z0       : REAL;
+    Sigma    : REAL;
+    Temp     : DINT;
+END_VAR
+BEGIN
+    // Generator liczb pseudolosowych (0..1)
+    Seed := (Seed * 1103515245 + 12345);
+    Temp := ABS(Seed / 65536) MOD 32768;
+    U1   := DINT_TO_REAL(Temp) / 32767.0;
+
+    Seed := (Seed * 1103515245 + 12345);
+    Temp := ABS(Seed / 65536) MOD 32768;
+    U2   := DINT_TO_REAL(Temp) / 32767.0;
+
+    // Ochrona przed log(0)
+    IF U1 <= 0.0 THEN
+        U1 := 0.000001;
+    END_IF;
+
+    // Box-Muller transform
+    Z0 := SQRT(-2.0 * LN(U1)) * COS(2.0 * 3.14159265359 * U2);
+
+    // Skalowanie do N(Mean, Variance)
+    Sigma := SQRT(Variance);
+    RandVal := Mean + Sigma * Z0;
+END_FUNCTION_BLOCK

@@ -1,0 +1,98 @@
+
+VAR
+    
+    Running        : BOOL;
+    Init           : BOOL;
+    TargetTimeMS   : INT;     
+    TargetTime     : TIME;
+
+    N              : INT := 20;   
+    TotalOps       : LINT;        
+    OpIdx          : LINT;        
+
+    
+    ii             : INT;
+    jj             : INT;
+    kk             : INT;
+
+    
+    StartTime      : LTIME;
+    EndTime        : LTIME;
+    Duration       : LTIME;
+    CycleCounter   : INT;
+
+    
+    TotalStart     : LTIME;
+    TotalEnd       : LTIME;
+END_VAR
+
+
+// ====== INIT) ======
+IF "Init" THEN
+    
+    "TargetTime" := INT_TO_TIME("TargetTimeMS");
+
+    
+    FOR ii := 0 TO "N" - 1 DO
+        FOR jj := 0 TO "N" - 1 DO
+            "Data_block_1".A[ii, jj] := 5.0;
+            "Data_block_1".B[ii, jj] := 7.0;
+            "Data_block_1".C[ii, jj] := 0.0;
+        END_FOR;
+    END_FOR;
+
+    
+    "TotalOps" := LINT("N") * LINT("N") * LINT("N"); // N^3
+    "OpIdx"    := 0;
+    "CycleCounter" := 0;
+
+    "Init" := FALSE;
+END_IF;
+
+
+// ====== START======
+IF "Running" AND ("OpIdx" = 0) THEN
+    "TotalStart" := TIME_TCK();
+END_IF;
+
+
+// ====== GŁÓWNA PĘTLA Z SCHEDULEREM ======
+IF "Running" THEN
+    "StartTime" := TIME_TCK();
+
+    WHILE "OpIdx" < "TotalOps" DO
+       
+        
+        "kk" := LINT_TO_INT("OpIdx" MOD LINT("N"));
+        
+        "jj" := LINT_TO_INT( ( "OpIdx" / LINT("N") ) MOD LINT("N") );
+        
+        "ii" := LINT_TO_INT( "OpIdx" / ( LINT("N") * LINT("N") ) );
+
+        
+        IF "kk" = 0 THEN
+            "Data_block_1".C["ii","jj"] := 0.0;
+        END_IF;
+
+        
+        "Data_block_1".C["ii","jj"] := "Data_block_1".C["ii","jj"]
+            + ("Data_block_1".A["ii","kk"] * "Data_block_1".B["kk","jj"]);
+
+       
+        "OpIdx" := "OpIdx" + 1;
+
+       
+        "EndTime"  := TIME_TCK();
+        "Duration" := "EndTime" - "StartTime";
+        IF "Duration" >= "TargetTime" THEN
+            "CycleCounter" := "CycleCounter" + 1;
+            EXIT; 
+        END_IF;
+    END_WHILE;
+
+    
+    IF "OpIdx" >= "TotalOps" THEN
+        "TotalEnd" := TIME_TCK();
+        "Running"  := FALSE;
+    END_IF;
+END_IF;

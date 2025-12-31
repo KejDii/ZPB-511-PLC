@@ -1,0 +1,33 @@
+FUNCTION "MatrixTranspose" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+   END_VAR
+
+
+BEGIN
+	#lb_1 := LOWER_BOUND(ARR := #A, DIM := 1);
+	#lb_2 := LOWER_BOUND(ARR := #A, DIM := 2);
+	#ub_1 := UPPER_BOUND(ARR := #A, DIM := 1);
+	#ub_2 := UPPER_BOUND(ARR := #A, DIM := 2);
+	FOR #i := #lb_2 TO #ub_2 DO
+	    FOR #j := #lb_1 TO #ub_1 DO
+	        #C[#i, #j] := #A[#j, #i];
+	    END_FOR;
+	END_FOR;
+	
+END_FUNCTION

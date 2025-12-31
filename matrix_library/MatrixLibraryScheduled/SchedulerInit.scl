@@ -1,0 +1,9 @@
+﻿FUNCTION "SchedulerInit" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+BEGIN
+	"Scheduler".time_start := TIME_TCK();
+	"Scheduler".flag_global := 0;
+END_FUNCTION
+

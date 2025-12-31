@@ -1,0 +1,50 @@
+// kod wykonuje się co 10 ms 
+"ENCODER_roznica" := "ENCODER_poprzednio" - "ENCODER_aktualne";
+"ENCODER_poprzednio" := "ENCODER_aktualne";
+
+//"obroty_OBRperSEK" := "ENCODER_roznica"/4096;
+"obroty_RADperSEK" := (2.0*3.14159/4096.0)*DINT_TO_REAL("ENCODER_roznica");
+//"obroty_DEGperSEK" := (360/4096)*"ENCODER_roznica";
+
+// z tacho, ale możliwe, że wzór działa tylko dla przerwań co 20 ms
+// "TachoSCALED" := (-0.02971 * INT_TO_REAL(WORD_TO_INT("AIE2")) - 180.2) * (2.0 * 3.14159 / 4096.0) * (1.0 / 0.02);
+// z ręki
+// "procentPWM"
+
+IF "runEwrls" THEN
+    // Add current values to arrays
+    "Db_1".Y["i"] := "obroty_RADperSEK";
+    "Db_1".U["i"] := "procentPWM" * 0.01; // as a fraction
+    // Update Phi vector
+    "ShiftAndAdd"(u := "Db_1".U["i"],
+                  y := "Db_1".Y["i"],
+                  Vec := "Db_ewrls".Phi);
+    // If enough samples were collected to begin EWRLS
+    IF "i" >= "start_i" THEN
+        IF "i" <= "M" THEN
+            // Calculate residual error: eps(i) = y(i) - Phi(i)' * Theta(i-1)
+            "EwrlsSetEps"(Phi := "Db_ewrls".Phi,
+                          Theta := "Db_ewrls".Theta_i,
+                          eps := "Db_ewrls".eps);
+            // Calculate K: K(i) = (P(i-1) * Phi(i)) / (lambda + Phi(i)' * P(i-1) * Phi(i))
+            "EwrlsSetK"(P := "Db_ewrls".P,
+                        Phi := "Db_ewrls".Phi,
+                        lambda := "lambda",
+                        K := "Db_ewrls".K);
+            // Calculate parameter vector: Theta(i) = Theta(i-1) + K(i) * eps(i)
+            "EwrlsSetTheta"(K := "Db_ewrls".K,
+                            eps := "Db_ewrls".eps,
+                            Theta := "Db_ewrls".Theta_i);
+            // Calculate P: P(i) = (P(i-1) - K(i) * Phi(i)' * P(i-1)) / lambda
+            "EwrlsSetP"(K := "Db_ewrls".K,
+                        Phi := "Db_ewrls".Phi,
+                        lambda := "lambda",
+                        P := "Db_ewrls".P);
+            "Db_ewrls".Theta["i"] := "Db_ewrls".Theta_i;
+        ELSE
+            "runEwrls" := FALSE;
+            "procentPWM" := 0;
+        END_IF;
+    END_IF;
+    "i" := "i" + 1;
+END_IF;

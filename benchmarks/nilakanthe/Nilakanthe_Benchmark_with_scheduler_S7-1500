@@ -1,0 +1,66 @@
+//zmienne do zdefiniowania
+VAR
+init: Bool
+Running: Bool
+i : DInt
+iteracje : DInt
+sum: LReal
+pi: LReal
+temp: LReal
+tStart: Time
+tEnd: Time
+Duration: Time
+TargetTime: Time
+TargetTimeMS: Int
+CycleCounter: Int
+END_VAR
+
+//inicjalizacja zmiennych
+IF "init" THEN
+    
+    "sum" := 3.0;
+    "i" := 0;
+    "pi" := 3.0;
+    "TargetTime" := INT_TO_TIME("TargetTimeMS");
+    "CycleCounter" := 0;
+    "init" := FALSE;
+    
+END_IF;
+
+//benchmark z schedulerem
+IF "Running" THEN
+    
+    //czas rozpoczecia
+    "tStart" := TIME_TCK();
+    
+    //glowna petla benchmarku - obliczanie wartosci liczby Pi metoda Nilakanthyego
+    WHILE "i" < "iteracje" DO
+        
+        "temp" := 4.0 / ((2.0 * ("i" + 1)) * (2.0 * ("i" + 1) + 1.0) * (2.0 * ("i" + 1) + 2.0));
+        
+        IF (("i" + 1) MOD 2) = 1 THEN
+            "sum" := "sum" + "temp";
+        ELSE
+            "sum" := "sum" - "temp";
+        END_IF;
+        
+        //aktualizacja iteratora
+        "i" := "i" + 1;
+        
+        //sprawdzenie aktualnego czasu cyklu i obliczanie czasu trwania
+        "tEnd" := TIME_TCK();
+        "Duration" := "tEnd" - "tStart";
+        
+        //sprawdzenie czy nie przekroczon TargetTime - max czasu trwania cyklu
+        IF "Duration" >= "TargetTime" THEN
+            "CycleCounter" := "CycleCounter" + 1;
+            EXIT;
+        END_IF;
+    END_WHILE;
+    
+    //jesli wykonano wszystkie operacje - zakoncz benchmark
+    IF "i" >= "iteracje" THEN
+        "pi" := "sum";
+        "Running" := FALSE;
+    END_IF;
+END_IF;

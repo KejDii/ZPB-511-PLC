@@ -1,0 +1,59 @@
+S7-1500
+
+//variables to define
+VAR
+Running : Bool
+A : Real
+B : Real
+C : Real
+D : Real
+Iterations : LInt
+I : LInt
+StartTime : LTime
+EndTime : LTime
+Duration : LTime
+CycleCounter : Int
+TargetTime : Time
+Init : Bool
+TargetTimeMS : Int
+END_VAR
+
+//Set iterations to max value e.g. 35000, Set TargetTimeMS e.g. 50 meaning 50MS, Set Init to TRUE, Set Running to TRUE to run benchmark with scheduler
+
+//Init data
+IF "Init" THEN
+    "A" := 1;
+    "B" := -1;
+    "C" := -1;
+    "D" := -1;
+    "TargetTime" := INT_TO_TIME("TargetTimeMS");
+    "Init" := FALSE;
+    "I" := 0;
+    "CycleCounter" := 0;
+END_IF;
+
+//Run benchmark
+IF "Running" THEN
+    //Start timer
+    "StartTime" := TIME_TCK();
+    WHILE "I" < "Iterations" DO
+        "A" := ("A" + "B" + "C" - "D") * 0.499975;
+        "B" := ("A" + "B" - "C" + "D") * 0.499975;
+        "C" := ("A" - "B" + "C" + "D") * 0.499975;
+        "D" := (- "A" + "B" + "C" + "D") * 0.499975;
+        "I" += 1;
+        //Read time
+        "EndTime" := TIME_TCK();
+        "Duration" := "EndTime" - "StartTime";
+        //If reached target time = go to the next cycle
+        IF "Duration" > "TargetTime" THEN
+            "CycleCounter" += 1;
+            EXIT;
+        END_IF;
+    END_WHILE;
+    //End if max iterations
+    IF "I" >= "Iterations" THEN
+        "Running" := FALSE;
+    END_IF;
+   
+END_IF;

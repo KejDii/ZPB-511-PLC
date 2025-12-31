@@ -1,0 +1,39 @@
+
+FOR "Data_block_1"."i" := 0 TO 19 DO
+    FOR "Data_block_1"."j" := 0 TO 19 DO
+        "Data_block_1"."A"["Data_block_1"."i", "Data_block_1"."j"] := 5.0;
+        "Data_block_1"."B"["Data_block_1"."i", "Data_block_1"."j"] := 7.0;
+    END_FOR;
+END_FOR;
+
+IF "start" AND NOT "koniec" THEN
+    
+    "executionTime" := 0;
+    "flops" := 0;
+
+    
+    "startTime_X" := TIME_TCK();
+    "startTime" := TIME_TO_LWORD("startTime_X");
+    
+    // Mnożenie macierzy
+    FOR "Data_block_1"."i" := 0 TO 19 DO
+        FOR "Data_block_1"."j" := 0 TO 19 DO
+            "Data_block_1".C["Data_block_1"."i", "Data_block_1"."j"] := 0.0;
+            FOR "Data_block_1"."k" := 0 TO 19 DO
+                "Data_block_1".C["Data_block_1"."i", "Data_block_1"."j"] :="Data_block_1".C["Data_block_1"."i","Data_block_1"."j"] + ("Data_block_1"."A"["Data_block_1"."i","Data_block_1"."k"] *"Data_block_1".B["Data_block_1"."k","Data_block_1"."j"]);
+            END_FOR;
+        END_FOR;
+    END_FOR;
+    "x" := 4;
+    "y" := 5;
+    "wynik" := "x" + "y";
+    
+    "endTime_X" := TIME_TCK();
+    "endTime" := TIME_TO_LWORD("endTime_X");
+    //"executionTime" := LINT_TO_LREAL("endTime" - "startTime") / 1000.0;
+    "executionTime" := "endTime" - "startTime";
+    "operations" := 2 * 20 * 20 * 20;
+    "flops" := "operations" / ("executionTime" /1000);
+
+    "koniec" := TRUE;
+END_IF;

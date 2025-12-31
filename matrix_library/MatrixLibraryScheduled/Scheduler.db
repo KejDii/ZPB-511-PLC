@@ -1,0 +1,20 @@
+﻿DATA_BLOCK "Scheduler"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      tm_break : Bool;
+      flag_global : DInt;
+      flag_iter : DInt;
+      time_start : Time;
+      time_bound : Time;
+      time_check : Time;
+      time_duration : Time;
+   END_VAR
+
+
+BEGIN
+   time_bound := T#50MS;
+
+END_DATA_BLOCK
+

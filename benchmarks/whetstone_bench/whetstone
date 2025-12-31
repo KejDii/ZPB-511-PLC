@@ -1,0 +1,89 @@
+The Whetstone benchmark was the first program in the literature to be explicitly designed for benchmarking. It was published in 1976 by H.J. Curnow and B.A. Wichmann from the National Physical
+Laboratory in Great Britain. The benchmark owes its name to the Whetstone Algol compiler system. The Whetstone benchmark can be divided into smaller groups where every section uses different type
+of statements such as floating-point arithmetic, integer arithmetic, relational operators, indexing and record selection. In order to keep the original structure and facilitate it the benchmark will
+be limited to floating-point arithmetic section as in module 1 of the benchmark. In every loop 16 floating-point operations will be performed and by measuring the time of certain amount of iterations
+the test will result in FLOPS. By setting the coefficient of multiplication to the value of 0.499975, the variables are guaranteed to change in every iteration, which supports the machine’s accuracy limits
+and therefore increases the credibility of the benchmark.
+
+PLCs (s7-1500, s7-1200) were tested with 5000 iterations. In every iteration 16 floating-point operations are performed on global variables. That way, number of iterations multiplied by
+floating-point operations and then divided by measured time gives the result in FLOPS.
+
+S7-1500
+
+//variables to define
+VAR
+Running : Bool
+A : Real
+B : Real
+C : Real
+D : Real
+Iterations : Int
+I : Int
+StartTime : Time
+EndTime : Time
+Duration : Time
+END_VAR
+
+IF "Running" THEN
+    "A" := 1;
+    "B" := -1;
+    "C" := -1;
+    "D" := -1;
+   
+    
+    //Start timer
+    "StartTime" := TIME_TCK();
+    FOR "I" := 1 TO "Iterations" DO
+        "A" := ("A" + "B" + "C" - "D") * 0.499975;        
+        "B" := ("A" + "B" - "C" + "D") * 0.499975;       
+        "C" := ("A" - "B" + "C" + "D") * 0.499975;      
+        "D" := (-"A" + "B" + "C" + "D") * 0.499975;        
+        
+    END_FOR;
+    // End timer
+    "EndTime" := TIME_TCK();
+    "Duration" := "EndTime" - "StartTime";
+    
+    "Running" := FALSE;
+END_IF;
+
+s7-1200
+
+//variables to define
+VAR
+Running : Bool
+Tag_1 : Int
+Tag_2 : Int
+A : Real
+B : Real
+C : Real
+D : Real
+Iterations : Int
+I : Int
+Data_Block : TimeBl
+	StartTime : DTL
+	EndTime : DTL
+END_VAR
+
+
+IF "Running" THEN
+    "A" := 1;
+    "B" := -1;
+    "C" := -1;
+    "D" := -1;
+   
+    
+    //Start timer
+    "Tag_1" := RD_LOC_T(OUT => "TimeBl".StartTime);
+    FOR "I" := 1 TO "Iterations" DO
+         "A" := ("A" + "B" + "C" - "D") * 0.499975;        
+        "B" := ("A" + "B" - "C" + "D") * 0.499975;       
+        "C" := ("A" - "B" + "C" + "D") * 0.499975;      
+        "D" := (-"A" + "B" + "C" + "D") * 0.499975;  
+    END_FOR;
+    // End timer
+    "Tag_2" := RD_LOC_T(OUT => "TimeBl".EndTime);
+    
+    
+    "Running" := FALSE;
+END_IF;

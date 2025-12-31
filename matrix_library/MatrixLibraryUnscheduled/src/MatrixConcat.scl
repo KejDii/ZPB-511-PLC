@@ -1,0 +1,73 @@
+FUNCTION "MatrixConcat" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      B : Array[*, *] of Real;
+      dim : UDInt;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      consistentDim : UDInt;
+      i : DInt;
+      j : DInt;
+      lb_consistent : DInt;
+      ub_consistent : DInt;
+      lb_a_inconsistent : DInt;
+      ub_a_inconsistent : DInt;
+      lb_b_inconsistent : DInt;
+      ub_b_inconsistent : DInt;
+      n : DInt;
+   END_VAR
+
+
+BEGIN
+	IF (#dim = 1) THEN
+	    #consistentDim := 2;
+	ELSIF (#dim = 2) THEN
+	    #consistentDim := 1;
+	ELSE
+	    RETURN;
+	END_IF;
+	
+	IF (LOWER_BOUND(ARR := #A, DIM := #consistentDim) = LOWER_BOUND(ARR := #B, DIM := #consistentDim) AND
+	    UPPER_BOUND(ARR := #A, DIM := #consistentDim) = UPPER_BOUND(ARR := #B, DIM := #consistentDim)) THEN
+	    #lb_consistent := LOWER_BOUND(ARR := #A, DIM := #consistentDim);
+	    #ub_consistent := UPPER_BOUND(ARR := #A, DIM := #consistentDim);
+	    #lb_a_inconsistent := LOWER_BOUND(ARR := #A, DIM := #dim);
+	    #ub_a_inconsistent := UPPER_BOUND(ARR := #A, DIM := #dim);
+	    #lb_b_inconsistent := LOWER_BOUND(ARR := #B, DIM := #dim);
+	    #ub_b_inconsistent := UPPER_BOUND(ARR := #B, DIM := #dim);
+	    #n := #ub_b_inconsistent - #lb_b_inconsistent + 1;
+	    IF (#dim = 1) THEN
+	        FOR #i := #lb_a_inconsistent TO #ub_a_inconsistent DO
+	            FOR #j := #lb_consistent TO #ub_consistent DO
+	                #C[#i, #j] := #A[#i, #j];
+	            END_FOR;
+	        END_FOR;
+	        FOR #i := 1 TO #n DO
+	            FOR #j := #lb_consistent TO #ub_consistent DO
+	                #C[#ub_a_inconsistent + #i, #j] := #B[#lb_b_inconsistent + #i - 1, #j];
+	            END_FOR;
+	        END_FOR;
+	    ELSIF (#dim = 2) THEN
+	        FOR #i := #lb_consistent TO #ub_consistent DO
+	            FOR #j := #lb_a_inconsistent TO #ub_a_inconsistent DO
+	                #C[#i, #j] := #A[#i, #j];
+	            END_FOR;
+	        END_FOR;
+	        FOR #i := #lb_consistent TO #ub_consistent DO
+	            FOR #j := 1 TO #n DO
+	                #C[#i, #ub_a_inconsistent + #j] := #B[#i, #lb_b_inconsistent + #j - 1];
+	            END_FOR;
+	        END_FOR;
+	    END_IF;
+	ELSE
+	    RETURN;
+	END_IF;
+	
+END_FUNCTION

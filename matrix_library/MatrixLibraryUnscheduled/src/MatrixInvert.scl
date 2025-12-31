@@ -1,0 +1,91 @@
+FUNCTION "MatrixInvert" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      k : DInt;
+      lb : DInt;
+      ub : DInt;
+      maxInd : DInt;
+      tempVal : Real;
+   END_VAR
+
+
+BEGIN
+	// WARNING 1: this function doesn't check whether the matrix is singular
+	
+	// WARNING 2: this function overwrites the matrix A. You need to create a copy
+	// if you wish to retain its values.
+	
+	// In this function, the A and C matrices are treated as if they are
+	// concatenated like this: [A C]. That means, for example, that if two rows are
+	// swapped, they're swapped in both matrices; or if elements of a row are 
+	// multiplied, they're also multiplied in both matrices.
+	#lb := LOWER_BOUND(ARR := #A, DIM := 1);
+	#ub := UPPER_BOUND(ARR := #A, DIM := 1);
+	// Check if A is a square array
+	IF (#lb = LOWER_BOUND(ARR := #A, DIM := 2) AND
+	    #ub = UPPER_BOUND(ARR := #A, DIM := 2)) THEN
+	    // Initialize C as an identity matrix of the same size as A
+	    "MatrixIdentity"(lb := #lb, ub := #ub, C => #C);
+	    // Gaussian elimination with pivoting
+	    FOR #i := #lb TO #ub DO
+	        // Find the index of the maximum absolute value from the values of the
+	        // i-th column of the A array that are on or below the diagonal
+	        #maxInd := #i;
+	        FOR #j := #i + 1 TO #ub DO
+	            IF (ABS(IN := #A[#j, #i]) > ABS(IN := #A[#maxInd, #i])) THEN
+	                #maxInd := #j;
+	            END_IF;
+	        END_FOR;
+	        // If the pivot is zero, the determinant will also be zero
+	        IF (ABS(#A[#maxInd, #i]) < 10 ** (-12)) THEN
+	            RETURN;
+	        END_IF;
+	        
+	        // If the pivot (#A[#maxInd, #i]) is not on the diagonal, swap rows so
+	        // that it is
+	        IF #maxInd <> #i THEN
+	            FOR #j := #lb TO #ub DO
+	                #tempVal := #A[#maxInd, #j];
+	                #A[#maxInd, #j] := #A[#i, #j]; // #A changed
+	                #A[#i, #j] := #tempVal; // #A changed
+	                #tempVal := #C[#maxInd, #j];
+	                #C[#maxInd, #j] := #C[#i, #j];
+	                #C[#i, #j] := #tempVal;
+	            END_FOR;
+	        END_IF;
+	        
+	        // Normalize i-th row according to the pivot
+	        #tempVal := #A[#i, #i];
+	        FOR #j := #lb TO #ub DO
+	            #A[#i, #j] := #A[#i, #j] / #tempVal; // #A changed
+	            #C[#i, #j] := #C[#i, #j] / #tempVal;
+	        END_FOR;
+	        
+	        // Subtract a multiple of one row from another to zero other elements
+	        // in the i-th column
+	        FOR #j := #lb TO #ub DO
+	            IF (#i <> #j) THEN
+	                #tempVal := #A[#j, #i] / #A[#i, #i];
+	                FOR #k := #lb TO #ub DO
+	                    #A[#j, #k] := #A[#j, #k] - #tempVal * #A[#i, #k]; // #A changed
+	                    #C[#j, #k] := #C[#j, #k] - #tempVal * #C[#i, #k];
+	                END_FOR;
+	            END_IF;
+	        END_FOR;
+	    END_FOR;
+	ELSE
+	    RETURN;
+	END_IF;
+	
+END_FUNCTION

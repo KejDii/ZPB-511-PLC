@@ -1,0 +1,24 @@
+FUNCTION "MatrixIdentity" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      lb : DInt;
+      ub : DInt;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+   END_VAR
+
+
+BEGIN
+	"MatrixFilled"(lb_1 := #lb, ub_1 := #ub, lb_2 := #lb, ub_2 := #ub, val := 0.0, C => #C);
+	FOR #i := #lb TO #ub DO
+	    #C[#i, #i] := 1;
+	END_FOR;
+	
+END_FUNCTION

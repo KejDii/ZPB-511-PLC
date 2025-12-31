@@ -1,0 +1,35 @@
+// Benchmark liczby pierwsze s7-1500
+IF "Data_block_1"."start" AND NOT "Data_block_1"."koniec" THEN
+    
+    // reset wyników
+    "Data_block_1"."primeCount" := 0;
+    "Data_block_1"."checks" := 0;
+    
+    // pomiar start
+    #startTIme2 := TIME_TCK();
+    
+    // glowna pętla benchmarku 
+    FOR #i := 2 TO "Data_block_1"."N" DO
+        #isPrime := TRUE;
+        #J := 2;
+        WHILE (#J * #J <= #i) AND #isPrime DO
+            "Data_block_1"."checks" := "Data_block_1"."checks" + 1;
+            IF (#i MOD #J) = 0 THEN
+                #isPrime := FALSE;
+            END_IF;
+            #J := #J + 1;
+        END_WHILE;
+        
+        IF #isPrime THEN
+            "Data_block_1"."primeCount" := "Data_block_1"."primeCount" + 1;
+        END_IF;
+    END_FOR;
+
+    // pomiar stop
+    #endTime2 := TIME_TCK();
+    
+    // różnica czasu w ms
+    "Data_block_1"."executionTime" := (#endTime2 - #startTIme2);
+    
+    "Data_block_1"."koniec" := TRUE;
+END_IF;

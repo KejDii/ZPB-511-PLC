@@ -1,0 +1,44 @@
+clc;
+clear;
+close all;
+
+N = 10000;
+start = true;
+koniec = false;
+
+primeCount = 0;
+checks = 0;
+executionTime = 0;
+
+if start && ~koniec
+
+    primeCount = 0;
+    checks = 0;
+    tic;
+
+    for i = 2:N
+        isPrime = true;
+        j = 2;
+        while (j * j <= i) && isPrime
+            checks = checks + 1;
+            if mod(i, j) == 0
+                isPrime = false;
+            end
+            j = j + 1;
+        end
+
+        if isPrime
+            primeCount = primeCount + 1;
+        end
+    end
+
+    executionTime = toc * 1000;
+
+    koniec = true;
+end
+
+%wyniki
+fprintf('N = %d\n', N);
+fprintf('Prime count = %d\n', primeCount);
+fprintf('Checks = %d\n', checks);
+fprintf('Execution time = %.2f ms\n', executionTime);

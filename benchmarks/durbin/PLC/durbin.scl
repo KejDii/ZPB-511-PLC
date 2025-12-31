@@ -1,0 +1,151 @@
+﻿FUNCTION_BLOCK "array_initialization"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_IN_OUT 
+      rArray : Array[0.."N"] of Real;
+      yArray : Array[0.."N"] of Real;
+      zArray : Array[0.."N"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : Int;
+   END_VAR
+
+
+BEGIN
+	FOR #i := 0 TO "N" DO
+	    #rArray[#i] := ("N" + 1 - #i);
+	    #yArray[#i] := 0;
+	    #zArray[#i] := 0;
+	END_FOR;
+	"initArrays" := FALSE;
+	
+END_FUNCTION_BLOCK
+
+DATA_BLOCK "Data_block_1"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      rArray : Array[0.."N"] of Real;
+      yArray : Array[0.."N"] of Real;
+      zArray : Array[0.."N"] of Real;
+      benchResults : Array[0.."M"] of UDInt;
+      myTime1 {InstructionName := 'DTL'; LibVersion := '1.0'} : DTL;
+      myTime2 {InstructionName := 'DTL'; LibVersion := '1.0'} : DTL;
+   END_VAR
+
+
+BEGIN
+
+END_DATA_BLOCK
+
+FUNCTION "avg_execution_time" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_OUTPUT 
+      avg : LReal;
+      variance : LReal;
+   END_VAR
+
+   VAR_IN_OUT 
+      results : Array[0.."M"] of UDInt;
+   END_VAR
+
+   VAR_TEMP 
+      i : Int;
+   END_VAR
+
+
+BEGIN
+	#avg := 0.0;
+	FOR #i := 0 TO "M" - 1 DO
+	    #avg := #avg + UDINT_TO_LREAL(#results[#i]);
+	END_FOR;
+	#avg := #avg / INT_TO_LREAL("M");
+	
+	#variance := 0.0;
+	FOR #i := 0 TO "M" - 1 DO
+	    #variance := #variance + (UDINT_TO_LREAL(#results[#i]) - #avg) ** 2;
+	END_FOR;
+	#variance := #variance / INT_TO_LREAL("M" - 1); //variance from sample
+	
+	"runBenchMTimes" := FALSE;
+	"k" := 0;
+	
+END_FUNCTION
+
+FUNCTION "durbin_unscheduled" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      rArray : Array[0.."N"] of Real;
+      k : Int;
+   END_VAR
+
+   VAR_IN_OUT 
+      yArray : Array[0.."N"] of Real;
+      zArray : Array[0.."N"] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      status : Int;
+      alpha : Real;
+      beta : Real;
+      sigma : Real;
+      i : Int;
+      j : Int;
+      "dT" : UDInt;
+   END_VAR
+
+
+BEGIN
+	// Based on the durbin benchmark available as a part of 
+	// PolyBench/C 4.2.1 (beta) by Louis-Noel Pouchet and Tomofumi Yuki:
+	// https://github.com/MatthiasJReisinger/PolyBenchC-4.2.1/tree/master/linear-algebra/solvers/durbin
+	// Copyright (c) 2011-2016 the Ohio State University.
+	// License: https://github.com/MatthiasJReisinger/PolyBenchC-4.2.1/tree/master?tab=License-1-ov-file#readme
+	#status := RD_LOC_T("Data_block_1".myTime2);
+	#yArray[0] := - #rArray[0];
+	#alpha := - #rArray[0];
+	#beta := 1.0;
+	
+	FOR #i := 1 TO "N" DO
+	    #beta := (1 - #alpha * #alpha) * #beta;
+	    #sigma := 0.0;
+	    FOR #j := 0 TO (#i - 1) DO
+	        #sigma := #sigma + #rArray[#i - #j - 1] * #yArray[#j];
+	    END_FOR;
+	    #alpha := - (#rArray[#i] + #sigma) / #beta;
+	    FOR #j := 0 TO (#i - 1) DO
+	        #zArray[#j] := #yArray[#j] + #alpha * #yArray[#i - #j - 1];
+	    END_FOR;
+	    FOR #j := 0 TO (#i - 1) DO
+	        #yArray[#j] := #zArray[#j];
+	    END_FOR;
+	    #yArray[#i] := #alpha;
+	END_FOR;
+	
+	// Stop the timer and get the difference
+	#status := RD_LOC_T("Data_block_1".myTime1);
+	IF "Data_block_1".myTime1.SECOND = "Data_block_1".myTime2.SECOND + 1 THEN
+	    #dT := 1_000_000_000 + "Data_block_1".myTime1.NANOSECOND - "Data_block_1".myTime2.NANOSECOND;
+	ELSIF "Data_block_1".myTime1.SECOND = "Data_block_1".myTime2.SECOND THEN
+	    #dT := "Data_block_1".myTime1.NANOSECOND - "Data_block_1".myTime2.NANOSECOND;
+	ELSE
+	    #dT := 0;
+	END_IF;
+	"Data_block_1".benchResults[#k] := #dT;
+	
+END_FUNCTION
+
+DATA_BLOCK "array_initialization_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"array_initialization"
+
+BEGIN
+
+END_DATA_BLOCK
+

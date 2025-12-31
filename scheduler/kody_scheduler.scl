@@ -1,0 +1,211 @@
+﻿FUNCTION "Matrix_mul" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      B : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      LB : DInt;
+      UB : DInt;
+      i : DInt;
+      j : DInt;
+      k : DInt;
+   END_VAR
+
+
+BEGIN
+	#LB := LOWER_BOUND(ARR := #A, DIM := 1);
+	#UB := UPPER_BOUND(ARR := #A, DIM := 1);
+	
+	FOR #i := #LB TO #UB DO
+	    FOR #j := #LB TO #UB DO
+	        FOR #k := #LB TO #UB DO
+	            #C[#i, #j] := #C[#i, #j] + #A[#i, #k] * #B[#k, #j];
+	        END_FOR;
+	    END_FOR;
+	END_FOR;
+END_FUNCTION
+
+FUNCTION "Matrix_mul_scheduled" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      B : Array[*, *] of Real;
+      limit : LInt;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_IN_OUT 
+      i : Int;
+      j : Int;
+      done : Bool;
+   END_VAR
+
+   VAR_TEMP 
+      LB : DInt;
+      UB : DInt;
+      czas_start : Date_And_Time;
+      out : Int;
+      k : Int;
+      czas_curr : Date_And_Time;
+      pass : Bool;
+   END_VAR
+
+
+BEGIN
+	#out := RD_SYS_T(#czas_start);
+	#LB := LOWER_BOUND(ARR := #A, DIM := 1);
+	#UB := UPPER_BOUND(ARR := #A, DIM := 1);
+	#pass := false;
+	WHILE NOT #pass AND NOT #done DO
+	    IF NOT #done THEN
+	        FOR "k" := #LB TO #UB DO
+	            #C[#i, #j] := #C[#i, #j] + #A[#i, "k"] * #B["k", #j];
+	        END_FOR;
+	        #j := #j + 1;
+	        IF #j > #UB THEN
+	            #j := #LB;
+	            #i := #i + 1;
+	            IF #i > #UB THEN
+	                #done := true;
+	            END_IF;
+	        END_IF;
+	    END_IF;
+	    #out := RD_SYS_T(#czas_curr);
+	    "czas" := (LTOD_TO_LINT(DT_TO_LTOD(#czas_curr)) - LTOD_TO_LINT(DT_TO_LTOD(#czas_start))) / 1000000;
+	    IF "czas" > #limit THEN
+	        #pass := true;
+	    END_IF;
+	END_WHILE;
+	
+END_FUNCTION
+
+FUNCTION "Matrix_mul_unscheduled" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      B : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_IN_OUT 
+      i : Int;
+      j : Int;
+      done : Bool;
+   END_VAR
+
+   VAR_TEMP 
+      LB : DInt;
+      UB : DInt;
+      k : Int;
+   END_VAR
+
+
+BEGIN
+	#LB := LOWER_BOUND(ARR := #A, DIM := 1);
+	#UB := UPPER_BOUND(ARR := #A, DIM := 1);
+	IF NOT #done THEN
+	    FOR #k := #LB TO #UB DO
+	        #C[#i, #j] := #C[#i, #j] + #A[#i, #k] * #B[#k, #j];
+	    END_FOR;
+	    #j := #j + 1;
+	    IF #j > #UB THEN
+	        #j := #LB;
+	        #i := #i + 1;
+	        IF #i > #UB THEN
+	            #done := true;
+	        END_IF;
+	    END_IF;
+	END_IF;
+	    
+END_FUNCTION
+
+FUNCTION_BLOCK "obliczenia"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      out : Int;
+   END_VAR
+
+
+BEGIN
+	#out := RD_SYS_T("DB".TIME1);
+	"Matrix_mul"(A := "DB".A,
+	             B := "DB".B,
+	             C => "DB".C);
+	
+	"licz" := false;
+	#out := RD_SYS_T("DB".TIME2);
+	
+	
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK "obliczenia_scheduled"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      out : Int;
+   END_VAR
+
+
+BEGIN
+	IF NOT "flaga" THEN
+	    "flaga" := true;
+	    #out := RD_SYS_T("DB".TIME1);
+	END_IF;
+	"Matrix_mul_scheduled"(A:="DB".A,
+	                       B:="DB".B,
+	                       limit:=200,
+	                       C=>"DB".C,
+	                       i:="i",
+	                       j:="j",
+	                       done:="done");
+	
+	IF "done" THEN
+	    #out := RD_SYS_T("DB".TIME2);
+	    "czas" := (LTOD_TO_LINT(DT_TO_LTOD("DB".TIME2)) - LTOD_TO_LINT(DT_TO_LTOD("DB".TIME1))) / 1000000;
+	    "licz_scheduled" := false;
+	END_IF;
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK "obliczenia_unscheduled"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      out : Int;
+   END_VAR
+
+
+BEGIN
+	IF NOT "flaga" THEN
+	    "flaga" := true;
+	    #out := RD_SYS_T("DB".TIME1);
+	END_IF;
+	"Matrix_mul_unscheduled"(A := "DB".A,
+	                         B := "DB".B,
+	                         C => "DB".C,
+	                         i := "i",
+	                         j := "j",
+	                         done := "done");
+	IF "done" THEN
+	    #out := RD_SYS_T("DB".TIME2);
+	    "czas" := (LTOD_TO_LINT(DT_TO_LTOD("DB".TIME2)) - LTOD_TO_LINT(DT_TO_LTOD("DB".TIME1))) / 1000000;
+	    "licz_unscheduled" := false;
+	END_IF;
+	
+END_FUNCTION_BLOCK
+

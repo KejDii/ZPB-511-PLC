@@ -1,0 +1,7 @@
+MatrixLibraryScheduled contains all of the matrix functions from MatrixLibrary but with overseeing scheduler. 
+
+Scheduler works with intended database named Scheduler.db.
+
+Main block ALWAYS has to start with calling a function SchedulerInit. It starts time measurement and sets global flag to 0 allowing the scheduler to work.
+
+Computations will work properly until the cycle time exceeds the defined by operator scheduled time. It may be changed by redefining the value of "Scheduler".time_bound variable. By default the value of it is set to 50 MS.

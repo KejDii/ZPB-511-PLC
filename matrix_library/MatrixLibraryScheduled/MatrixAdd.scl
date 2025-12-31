@@ -1,0 +1,74 @@
+﻿FUNCTION "MatrixAdd" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      B : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_IN_OUT 
+      flag_local : DInt;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+      time_check : Time;
+   END_VAR
+
+
+BEGIN
+	//if rhere is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    "Scheduler".time_check := TIME_TCK();
+	    "Scheduler".time_duration := "Scheduler".time_check - "Scheduler".time_start;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        #lb_1 := LOWER_BOUND(ARR := #A, DIM := 1);
+	        #lb_2 := LOWER_BOUND(ARR := #A, DIM := 2);
+	        #ub_1 := UPPER_BOUND(ARR := #A, DIM := 1);
+	        #ub_2 := UPPER_BOUND(ARR := #A, DIM := 2);
+	        IF (#lb_1 = LOWER_BOUND(ARR := #B, DIM := 1) AND
+	            #lb_2 = LOWER_BOUND(ARR := #B, DIM := 2) AND
+	            #ub_1 = UPPER_BOUND(ARR := #B, DIM := 1) AND
+	            #ub_2 = UPPER_BOUND(ARR := #B, DIM := 2)) THEN
+	            FOR #i := #lb_1 TO #ub_1 DO
+	                FOR #j := #lb_2 TO #ub_2 DO
+	                    #C[#i, #j] := #A[#i, #j] + #B[#i, #j];
+	                END_FOR;
+	            END_FOR;
+	        ELSE
+	            "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	            RETURN;
+	        END_IF;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+END_FUNCTION
+

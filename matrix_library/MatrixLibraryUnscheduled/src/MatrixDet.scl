@@ -1,0 +1,87 @@
+FUNCTION "MatrixDet" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      det : Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      k : DInt;
+      lb : DInt;
+      ub : DInt;
+      n : DInt;
+      maxInd : DInt;
+      sign : Int;
+      tempVal : Real;
+   END_VAR
+
+
+BEGIN
+	#lb := LOWER_BOUND(ARR := #A, DIM := 1);
+	#ub := UPPER_BOUND(ARR := #A, DIM := 1);
+	// Check if A is a square array
+	IF (#lb = LOWER_BOUND(ARR := #A, DIM := 2) AND
+	    #ub = UPPER_BOUND(ARR := #A, DIM := 2)) THEN
+	    #n := #ub - #lb;
+	    IF #n = 1 THEN
+	        #det := #A[#lb, #lb];
+	    ELSIF #n = 2 THEN
+	        #det := #A[#lb, #lb] * #A[#ub, #ub] - #A[#lb, #ub] * #A[#ub, #lb];
+	    ELSE
+	        #det := 1.0;
+	        #sign := 1;
+	        // Use Gaussian elimination with pivoting to obtain the upper
+	        // triangular form
+	        FOR #i := #lb TO #ub DO
+	            // Find the index of the maximum absolute value from the values of
+	            // the i-th column of the A array that are on or below the diagonal
+	            #maxInd := #i;
+	            FOR #j := #i + 1 TO #ub DO
+	                IF (ABS(IN := #A[#j, #i]) > ABS(IN := #A[#maxInd, #i])) THEN
+	                    #maxInd := #j;
+	                END_IF;
+	            END_FOR;
+	            // If the pivot is zero, the determinant will also be zero
+	            IF (ABS(#A[#maxInd, #i]) < 10 ** (-12)) THEN
+	                #det := 0.0;
+	                EXIT;
+	            END_IF;
+	            
+	            // If the pivot (#A[#maxInd, #i]) is not on the diagonal, swap rows
+	            // so that it is and change the sign
+	            IF #maxInd <> #i THEN
+	                FOR #j := #lb TO #ub DO
+	                    #tempVal := #A[#maxInd, #j];
+	                    #A[#maxInd, #j] := #A[#i, #j]; // #A changed only locally
+	                    #A[#i, #j] := #tempVal; // #A changed only locally
+	                END_FOR;
+	                #sign := -#sign;
+	            END_IF;
+	            
+	            // Subtract a multiple of one row from another to zero elements in the
+	            // i-th column that are below the diagonal
+	            FOR #j := #i + 1 TO #ub DO
+	                #tempVal := #A[#j, #i] / #A[#i, #i];
+	                FOR #k := #lb TO #ub DO
+	                    #A[#j, #k] := #A[#j, #k] - #tempVal * #A[#i, #k]; // #A changed only locally
+	                END_FOR;
+	            END_FOR;
+	        END_FOR;
+	        
+	        IF (#det <> 0) THEN
+	            FOR #i := #lb TO #ub DO
+	                #det := #det * #A[#i, #i];
+	            END_FOR;
+	            #det := #det * INT_TO_REAL(#sign);
+	        END_IF;
+	    END_IF;
+	ELSE
+	    RETURN;
+	END_IF;
+END_FUNCTION

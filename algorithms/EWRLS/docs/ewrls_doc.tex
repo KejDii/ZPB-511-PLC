@@ -1,0 +1,80 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[margin=1.5cm]{geometry}
+\usepackage{amsfonts, amssymb, amsmath}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{bm}
+
+
+\begin{document}
+\noindent {\bfseries\LARGE A description of the EWRLS (equally weighted recursive least squares) algorithm\par}
+\bigskip\noindent
+
+The equally weighted recursive least squares algorithm uses data from two 
+vectors of length $M+1$:
+\begin{itemize}
+\item the $U$ vector, which contains collected input data, and 
+\item the $Y$ vector, which contains collected output data.
+\end{itemize}
+
+They can be written as such:
+
+\begin{equation*}
+\bm{u}^{T} = \begin{bmatrix} u(0) & u(1) & \dots & u(M-1) & u(M) \end{bmatrix} \text{,}
+\end{equation*}
+\begin{equation*}
+\bm{y}^{T} = \begin{bmatrix} y(0) & y(1) & \dots & y(M-1) & y(M) \end{bmatrix} \text{.}
+\end{equation*}
+
+The aforementioned data is used to create an ARX model in the following form: 
+
+\begin{equation*}
+y(i) = \sum_{j = 1}^{r} a_{j}y(i-j) + \sum_{j = 1}^{q} b_{j}u(i-j) + n(i) \text{,}
+\end{equation*}
+
+where $n(i)$ is the measurement noise. 
+
+During the algorithm's run, the subset of data used for calculations and the values of model's coefficients change with each iteration. Both are stored in vectors:
+\begin{itemize} 
+\item regression vector $\bm{\varphi}^{T}(i) = \begin{bmatrix} y(i-1) & \dots & y(i-r) & u(i-1) & \dots & u(i-q) \end{bmatrix}$,
+\item estimated parameter vector $\hat{\bm{\theta}}^{T}(i) = \begin{bmatrix} a_{1}(i) & \dots & a_{r}(i) & b_{1}(i) & \dots & b_{q}(i) \end{bmatrix}$ (as opposed to the vector of true model parameters).
+\end{itemize}
+
+Before running the algorithm, some crucial values are initialized:
+\begin{itemize}
+\item $0 < \lambda \leq 1$: the forgetting factor, used for estimation of non-stationary processes ($\lambda = 1$ means no forgetting).
+\item $i = \max \{ r,q \}$: the number of the sample the algorithm will begin its calculations from. Generally, EWRLS can pad the $U$ and $Y$ vectors with zeroes at their beginnings and start calculations from the 0th sample, but in this implementation it is assumed that there are enough data samples for it not to be necessary.
+\item $c$: a "large value" to initialize $\bm{P}$. Could be set to, for example, $10^{6}$.
+\item $\bm{P}(i-1)$: the $\bm{P}$ matrix (the inverse of the autocorrelation matrix $\bm{R}$) used in the first iteration of the algorithm. It's set to be an identity matrix of size $(r+q) \times (r+q)$ multiplied by $c$, like so:
+\begin{equation*}
+\bm{P}(i-1) = \begin{bmatrix}
+	c      & 0      & 0      & \dots  & 0 \\
+	0      & c      & 0      & \dots  & 0 \\
+	0      & 0      & c      & \dots  & 0 \\
+	\vdots & \vdots & \vdots & \ddots & \vdots \\
+	0      & 0      & 0      & \dots  & c 
+\end{bmatrix}_{(r+q) \times (r+q)} \text{.}
+\end{equation*}
+\item $\hat{\bm{\theta}}^{T}(i-1)$: the $\hat{\bm{\theta}}$ vector used in the first iteration of the algorithm. It's filled with zeroes.
+\end{itemize}
+
+The algorithm itself is performed $M-\max \{ r,q \}+1$ times using the following equations:
+\begin{equation*}
+\varepsilon(i) = y(i)-\bm{\varphi}^{T}(i)\hat{\bm{\theta}}(i-1)
+\end{equation*}
+\begin{equation*}
+\bm{k}(i) = \frac{\bm{P}(i-1)\bm{\varphi}(i)}{\lambda+\bm{\varphi}^{T}(i)\bm{P}(i-1)\bm{\varphi}(i)}
+\end{equation*}
+\begin{equation*}
+\hat{\bm{\theta}}(i) = \hat{\bm{\theta}}(i-1) + \bm{k}(i)\varepsilon(i)
+\end{equation*}
+\begin{equation*}
+\bm{P}(i) = \frac{1}{\lambda} \left(\bm{P}(i-1) - \bm{k}(i)\bm{\varphi}^{T}(i)\bm{P}(i-1) \right) \text{.}
+\end{equation*}
+
+The last obtained paramter vector, $\hat{\bm{\theta}}(M)$, contains the final model parameters. At the end, as a measure of fitness, the mean squared error is calculated for the obtained model parameters: 
+\begin{equation*}
+J_{M}(\bm{\theta}) = \sum_{j=0}^{M} \left[ y(j)-\bm{\varphi}^{T}(j)\hat{\bm{\theta}}(M) \right]^{2} \text{.}
+\end{equation*}
+\end{document}

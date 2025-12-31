@@ -1,0 +1,41 @@
+Metoda Nilakanthy’ego jest jednym z klasycznych algorytmów przybliżonego wyznaczania wartości liczby π. 
+Jej główną zaletą jest szybka zbieżność w porównaniu do prostszych szeregów, takich jak rozwinięcie Leibniza, a jednocześnie zachowanie prostej 
+struktury obliczeń. Wzór ogólny dla tej metody został przedstawiony w pliku wzor_Nilakanthe.png.
+
+W praktyce obliczenia rozpoczyna się od wartości początkowej równej 3, a następnie w każdej iteracji dodaje lub odejmuje kolejne wyrażenie ułamkowe, 
+którego mianownik jest iloczynem trzech kolejnych liczb całkowitych parzystej i nieparzystych, a licznik ma wartość stałą 4. Współczynniki te rosną 
+w sposób regularny, a znak składnika zmienia się naprzemiennie w zależności od parzystości numeru iteracji.
+
+Metoda ta jest szczególnie interesująca w kontekście testów wydajnościowych (benchmarków) urządzeń sterujących, takich jak sterowniki PLC, z dwóch powodów:
+
+1. powtarzalność obliczeń – każda iteracja wykonuje identyczny zestaw prostych operacji zmiennoprzecinkowych (mnożenie, dodawanie, dzielenie), co pozwala 
+na precyzyjne oszacowanie liczby operacji w całym procesie.
+2. niewielkie wymagania pamięciowe – obliczenia bazują na prostych zmiennych liczbowych, bez konieczności alokacji dużych tablic czy struktur danych, 
+co eliminuje wpływ dostępu do pamięci na wynik testu i pozwala skupić się na wydajności jednostki obliczeniowej CPU.
+
+W przypadku metody Nilakanthy’ego liczba operacji zmiennoprzecinkowych (FLOP) przypadających na jedną iterację jest stała – w implementacji wykorzystanej 
+w niniejszych badaniach jest to 9 operacji na iterację. Dzięki temu można łatwo obliczyć całkowitą liczbę wykonanych operacji oraz 
+wskaźnik FLOPS (Floating Point Operations Per Second) na podstawie zmierzonego czasu wykonania pętli.
+
+Działanie programu krok po kroku:
+1. Sprawdzenie warunków startu programu: flagi "Start" i "Koniec"
+2. Resetowanie zmiennych: "sum" := 3.0 (pierwszy wyraz szeregu Nilakanthyego), zerowanie licznika czasu i liczby operacji.
+3. Pomiar czasu startu obliczeń
+4. Pętla obliczeniowa dla kolejnych wartości "i" od 1 do "iteracje" (całkowita liczba iteracji do wykonania). Obliczana jest wartość składnika "temp":
+  jeżeli "i" jest nieparzyste to "temp" jest dodawane do "sum"
+  jeżeli "i" jest parzyste to "temp" jest odejmowane od "sum"
+5. Zapis wyniku obliczeń liczby Pi.
+6. Pomiar czasu zakończenia obliczeń
+7. Obliczenie liczby operacji
+8. Ustawienie flagi "Koniec" - koniec obliczeń, blokuje ponowne wykonanie programu bez resetu flagi
+
+
+Po zakończeniu obliczeń w obu przypadkach wyznaczana jest całkowita liczba operacji (operacje = 9 × iteracje), co w połączeniu z czasem wykonania pozwala 
+obliczyć wskaźniki wydajności procesora sterownika w jednostkach FLOPS. Zastosowanie metody Nilakanthy’ego w tym kontekście pozwala na uzyskanie powtarzalnych, 
+porównywalnych i obiektywnych wyników benchmarku, a tym samym dając rzetelną ocenę czystej mocy obliczeniowej CPU sterowników PLC.
+
+​Źródla:
+https://en.wikipedia.org/wiki/Pi
+https://www.researchgate.net/publication/283579663_Nilakantha%27s_accelerated_series_for_pi
+https://www.geeksforgeeks.org/dsa/calculate-pi-using-nilkanthas-series
+https://web.archive.org/web/20230314224252/https://www.maa.org/sites/default/files/images/upload_library/22/Allendoerfer/1991/0025570x.di021167.02p0073q.pdf
