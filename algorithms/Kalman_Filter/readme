@@ -1,1 +1,32 @@
-Tu będzie readme filtru
+Prior to use of the Kalman filter function it is necessary to set the correct matrices sizes in Kalman filter database (with respect to comments and below designations) and the values of the Q, R, A, B, C matrices.
+u, y have to be updated every iteration of the algorithm.
+n - state space size, m - inputs size, p - outputs size.
+Kalman_filter_1200.scl was used on s7-1215/1214 PLCs
+Kalman_filter_1500.scl was used on s7-1514 PLC.
+
+Implemented scheduler requires the calling of the scheduler_init function at the beginning of every cycle - call it at the beginning of the main block.
+
+If the function is used in cyclic interrupt block it's required to put the copy of the scheduled algorithm code in the main block under the if(scheduler.tm_break) condition as shown below:
+CYCLIC INTERRUPT PART
+....
+Kalman_Filter();
+...
+[1]Matrix_add();
+[2]Matrix_mul();
+....
+[3]y=y_est(1);
+END OF CYCLIC INTERRUPT
+
+MAIN
+Scheduler_init();
+...
+IF Scheduler.tm_break THEN
+Kalman_Filter();
+[1]Matrix_add();
+[2]Matrix_mul();
+[3]y=y_est(1);
+END_IF;
+
+If the cycle time is exceeded (with respect to Scheduler.time_bound) the further matrices functions are not executed within the cyclic interrupt block. The rest of the algorithm has to be performed inside the
+next cycle (before the another execution of cyclic interrupt block) - in the main block. To make this possible all of the sequential functions/computations have to be duplicated and put in the main block as shown above.
+It guarantees that all of the computations not performed in the primary cyclic interrupt block can be finished in the following PLC cycle - this time in the main block (before another cyclic interrupt call).

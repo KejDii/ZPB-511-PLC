@@ -1,0 +1,148 @@
+The project implements a Model Reference Adaptive Control (MRAC) algorithm in the SCL language for a Siemens PLC controller.
+The entire implementation was designed in a modular manner so that all numerical computations and mathematical operations are performed exclusively using 
+predefined matrix and scalar functions, while the core control algorithm remains clear, readable, and easy to modify. No direct algebraic matrix operations 
+are used in the main algorithm code; instead, every operation such as addition, subtraction, multiplication, transposition, or scaling is executed via 
+dedicated functions such as MatrixAdd, MatrixSub, MatrixMul, MatrixMulVal, MatrixTranspose, MatrixAssign, and auxiliary helper functions.Similarly, scalar 
+operations are handled through the functions ScalarAssign, ScalarLimit, ScalarRateLimit, and ScalarScale, which are responsible, among other tasks, for 
+limiting the amplitude and rate of change of the control signal.
+
+The central element of the algorithm is the MRAC_Update function, which contains the complete logic of the adaptive control system. Within this function, 
+the reference model is computed, the reference model output (ym) is calculated, and the control error (e) is determined as the difference between the plant 
+output (y) and the reference model output (ym). Next, the control law is implemented as a combination of the reference input and the plant state using the
+adaptive gains kr and kx. Based on this formulation, the adaptation laws are applied to update the controller gains in real time. Additionally, a sigma 
+modification is included to stabilize the adaptive parameters and prevent their unbounded drift. In the later part of the function, the control signal is 
+generated and mapped to a PWM value, taking into account nonlinear characteristics, amplitude limits, and rate-of-change constraints.
+
+The MRAC_Update function is not called directly but is executed through the MRAC_Execute organization block, which serves as the execution layer of the 
+algorithm. In this block, measurement signals are prepared, the MRAC algorithm is invoked, and the scheduler mechanism is handled. The scheduler is 
+responsible for controlling the execution time of computations and enables interrupting and resuming calculations across successive PLC cycles when a 
+predefined time limit is exceeded. This ensures that the algorithm can be safely executed in a PLC environment without violating cycle time constraints.
+
+The algorithm is started by setting the run_test flag (BOOL variable) to TRUE. Once activated, the MRAC algorithm is executed cyclically, and the MRAC_Update
+function is called in each cycle of the MRAC_Execute block. The reference value is stored in the variable DB_MRAC.r and can be set before starting the 
+algorithm or modified dynamically during operation. Prior to running the algorithm, it is necessary to properly initialize the adaptation parameters, such 
+as the adaptation gains gamma_kr and gamma_kx, the matrix P, the parameters of the reference model and the plant, as well as the control signal limitation 
+parameters. Incorrect selection of these parameters may lead to unstable system behavior. Stopping the algorithm is achieved by setting the run_test flag to 
+FALSE, which interrupts further computations, resets the control signal to zero, and clears auxiliary counters. During algorithm execution, selected 
+signals—such as the plant output, reference model output, and PWM signal—can be stored in data structures for subsequent analysis of the results. The entire
+code architecture is currently based on 1×1 matrices; however, the adopted approach allows for straightforward extension to higher-dimensional systems and 
+further research experiments. It should also be emphasized that the universal matrix functions contained in the "matrix_library" folder were adapted to the
+capabilities of the Siemens S7-1200 controller, which is directly connected to and used for controlling the servo drive. Originally, these functions were 
+designed in a generic manner, allowing operations on matrices of arbitrary symbolic sizes (e.g., [*, *]). Due to limitations of the S7-1200 platform, 
+such flexibility is not supported, making it necessary to explicitly and unambiguously define matrix dimensions (e.g., [1,1] or [2,2]) directly in function 
+declarations. This adaptation preserves the structure of the MRAC algorithm while ensuring correct and deterministic execution in the PLC environment.
+
+Below is a summary of all blocks and functions used in this project:
+
+DATA_BLOCK Scheduler – stores the state of the computation scheduling mechanism (break flag, iteration flags, and execution time measurement), enabling computations to be split across PLC cycles.
+
+FUNCTION SchedulerInit – initializes the scheduler by storing the start time and resetting the global iteration counter.
+
+FUNCTION MatrixAdd – performs addition of two matrices with scheduler support.
+
+FUNCTION MatrixAddVal – adds a scalar value to a matrix element and returns the result as a scalar.
+
+FUNCTION MatrixSub – performs subtraction of two matrices.
+
+FUNCTION MatrixMul – performs multiplication of two matrices.
+
+FUNCTION MatrixMulVal – multiplies a matrix by a scalar value.
+
+FUNCTION MatrixAssign – copies the contents of one matrix into another.
+
+FUNCTION MatrixTranspose – performs matrix transposition.
+
+FUNCTION MatrixIdentity – generates an identity matrix.
+
+FUNCTION MatrixInvert – computes the inverse of a matrix.
+
+FUNCTION MatrixFilled – fills a matrix with a specified value over a defined index range.
+
+FUNCTION ScalarAssign – assigns a scalar value to an output variable.
+
+FUNCTION ScalarLimit – limits a scalar value to a specified min–max range.
+
+FUNCTION ScalarRateLimit – limits the maximum rate of change of a signal between consecutive executions.
+
+FUNCTION ScalarScale – performs linear scaling of a signal in the form a·x + b.
+
+FUNCTION MRAC_Update – the core MRAC algorithm function, defining the reference model, control law, adaptation laws, and PWM signal generation.
+
+ORGANIZATION_BLOCK MRAC_Execute – demonstrates practical use of the MRAC algorithm within the PLC cycle, including signal acquisition, algorithm execution, and data logging.
+
+FUNCTION_BLOCK RBF – implements Gaussian radial basis functions for nonlinear approximation (currently not used in the control law).
+
+DATA_BLOCK DB_MRAC – contains all parameters, states, adaptive gains, and auxiliary signals of the MRAC algorithm.
+
+
+
+
+Before starting the MRAC algorithm, the following configuration steps must be completed in the PLC project:
+
+
+1. Configure the scheduler (mandatory)
+
+  * Set maximum computation time per PLC cycle - Scheduler.time_bound
+
+
+2. Define and configure the data block DB_MRAC
+
+  *Controlled object parameters
+    - System matrix DB_MRAC.A
+    - Input matrix DB_MRAC.B
+    - Output matrix DB_MRAC.C
+
+  *Reference model parameters
+
+    - Reference model system matrix DB_MRAC.Am
+    - Reference model input matrix DB_MRAC.Bm
+
+  *Lyapunov and adaptation parameters
+    
+    - Lyapunov matrix DB_MRAC.P
+    - Adaptation gain for reference signal DB_MRAC.gamma_kr
+    - Adaptation gain for state feedback DB_MRAC.gamma_kx
+    - (Optional) Adaptation gain for RBF network DB_MRAC.gamma_w
+    - Sigma-modification coefficient DB_MRAC.sigma_mod
+
+  *Initial adaptive gains
+
+    - Initial reference gain DB_MRAC.kr
+    - Initial state feedback gain DB_MRAC.kx
+
+  *System and model states*
+
+    - System state vector DB_MRAC.x
+    - Reference model state vector DB_MRAC.xm
+
+  *Reference signal
+
+    - Desired reference value DB_MRAC.r
+
+
+3. Actuator and signal constraints (if you are working with real plant)
+
+  - PWM output signal DB_MRAC.pwm
+  - Previous PWM value (for rate limiting) DB_MRAC.last_pwm
+  - Maximum allowed PWM rate of change DB_MRAC.max_delta_pwm
+
+
+4. External PLC tags (if you are working with real plant) 
+
+  - Measurement input (e.g. speed/position) mapped to `DB_MRAC.x` in `MRAC_Execute`
+  - Control output (PWM or percentage) mapped from `DB_MRAC.pwm`
+
+
+5. Algorithm control
+
+  -Start/stop flag run_test (BOOL)
+
+
+6. Scheduler initialization
+
+  -Call before first execution or restart SchedulerInit()
+
+
+
+
+

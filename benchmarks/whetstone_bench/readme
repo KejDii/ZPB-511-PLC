@@ -8,9 +8,17 @@ and therefore increases the credibility of the benchmark.
 PLCs (s7-1500, s7-1200) were tested with 5000 iterations. In every iteration 16 floating-point operations are performed on global variables. That way, number of iterations multiplied by
 floating-point operations and then divided by measured time gives the result in FLOPS.
 
-S7-1500
+PCs were tested with use of the Whetstone benchmark written in whetstone.m (MATLAB) file.
+
+Whetstone_time_scheduler is a whetstone benchmark version with implemented scheduler in the test version. It was being developed at the time.
+
+The variables that are being used in conducting a benchmark are listed below. It's important to note that Iterations variable should be set to expected value of iterations of the benchmark depending on the
+computational capabilities of the PLC.
+
+The source codes in whetstone-s7-1500 and whetstone-s7-1200 should be pasted into the main branch.
 
 //variables to define
+S7-1500
 VAR
 Running : Bool
 A : Real
@@ -24,32 +32,8 @@ EndTime : Time
 Duration : Time
 END_VAR
 
-IF "Running" THEN
-    "A" := 1;
-    "B" := -1;
-    "C" := -1;
-    "D" := -1;
-   
-    
-    //Start timer
-    "StartTime" := TIME_TCK();
-    FOR "I" := 1 TO "Iterations" DO
-        "A" := ("A" + "B" + "C" - "D") * 0.499975;        
-        "B" := ("A" + "B" - "C" + "D") * 0.499975;       
-        "C" := ("A" - "B" + "C" + "D") * 0.499975;      
-        "D" := (-"A" + "B" + "C" + "D") * 0.499975;        
-        
-    END_FOR;
-    // End timer
-    "EndTime" := TIME_TCK();
-    "Duration" := "EndTime" - "StartTime";
-    
-    "Running" := FALSE;
-END_IF;
-
-s7-1200
-
 //variables to define
+S7-1200
 VAR
 Running : Bool
 Tag_1 : Int
@@ -64,26 +48,3 @@ Data_Block : TimeBl
 	StartTime : DTL
 	EndTime : DTL
 END_VAR
-
-
-IF "Running" THEN
-    "A" := 1;
-    "B" := -1;
-    "C" := -1;
-    "D" := -1;
-   
-    
-    //Start timer
-    "Tag_1" := RD_LOC_T(OUT => "TimeBl".StartTime);
-    FOR "I" := 1 TO "Iterations" DO
-         "A" := ("A" + "B" + "C" - "D") * 0.499975;        
-        "B" := ("A" + "B" - "C" + "D") * 0.499975;       
-        "C" := ("A" - "B" + "C" + "D") * 0.499975;      
-        "D" := (-"A" + "B" + "C" + "D") * 0.499975;  
-    END_FOR;
-    // End timer
-    "Tag_2" := RD_LOC_T(OUT => "TimeBl".EndTime);
-    
-    
-    "Running" := FALSE;
-END_IF;

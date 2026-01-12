@@ -1,0 +1,1148 @@
+DATA_BLOCK "Scheduler"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      tm_break : Bool;
+      flag_global : DInt;
+      flag_iter : DInt;
+      time_start {InstructionName := 'DTL'; LibVersion := '1.0'} : DTL;
+      time_bound : UDInt;
+      time_check {InstructionName := 'DTL'; LibVersion := '1.0'} : DTL;
+      time_duration : UDInt;
+   END_VAR
+BEGIN
+   time_bound := 4000000000; // max computation time [ns]
+END_DATA_BLOCK
+
+
+FUNCTION "MatrixAdd" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[1..1, 1..1] of Real;
+      B : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_OUTPUT 
+      C : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+      time_check : Time;
+      status : Int;
+   END_VAR
+BEGIN
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 +
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration :=
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    IF NOT "Scheduler".tm_break THEN
+	        #C[1,1] := #A[1,1] + #B[1,1];
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+END_FUNCTION
+
+FUNCTION "MatrixAddVal" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[1..1, 1..1] of Real;
+      B : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Real;
+   END_VAR
+
+   VAR_TEMP 
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	// if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR
+	   ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    
+	    // correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    // local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    // time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration :=
+	            1_000_000_000 +
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration :=
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    // if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    // if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        #C := #A[1, 1] + #B;
+	    END_IF;
+	END_IF;
+	
+	// iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+END_FUNCTION
+
+
+FUNCTION "MatrixAssign" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_OUTPUT 
+      C : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb1 : DInt;
+      lb2 : DInt;
+      ub1 : DInt;
+      ub2 : DInt;
+      status : Int;
+   END_VAR
+BEGIN
+	IF (NOT "Scheduler".tm_break) OR
+	    ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration :=
+	            1_000_000_000 +
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration :=
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    IF NOT "Scheduler".tm_break THEN
+	        #C[1,1] := #A[1,1];
+	    END_IF;
+	END_IF;
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+END_FUNCTION
+
+
+FUNCTION "MatrixFilled" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      lb_1 : DInt;
+      ub_1 : DInt;
+      lb_2 : DInt;
+      ub_2 : DInt;
+      val  : Real;
+   END_VAR
+   VAR_OUTPUT 
+      C : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+   END_VAR
+BEGIN
+	// fill matrix with constant value
+	FOR #i := #lb_1 TO #ub_1 DO
+	    FOR #j := #lb_2 TO #ub_2 DO
+	        #C[#i,#j] := #val;
+	    END_FOR;
+	END_FOR;
+END_FUNCTION
+
+
+FUNCTION "MatrixIdentity" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      lb : DInt;
+      ub : DInt;
+   END_VAR
+   VAR_OUTPUT 
+      C : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_TEMP 
+      i : DInt;
+   END_VAR
+BEGIN
+	// generate identity matrix
+	#C[1,1] := 1;
+END_FUNCTION
+
+
+FUNCTION "MatrixInvert" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_OUTPUT 
+      C : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      k : DInt;
+      lb : DInt;
+      ub : DInt;
+      maxInd : DInt;
+      tempVal : Real;
+      status : Int;
+   END_VAR
+BEGIN
+	// WARNING: no singularity check
+	IF (NOT "Scheduler".tm_break) OR
+	   ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration :=
+	            1_000_000_000 +
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration :=
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    IF NOT "Scheduler".tm_break THEN
+	        #C[1,1] := 1.0 / #A[1,1];
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+END_FUNCTION
+
+
+FUNCTION "MatrixMul" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[1..1, 1..1] of Real;
+      B : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_OUTPUT 
+      C : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      status : Int;
+      k : DInt;
+      lb_a_1 : DInt;
+      lb_a_2 : DInt;
+      ub_a_1 : DInt;
+      ub_a_2 : DInt;
+      lb_b_1 : DInt;
+      lb_b_2 : DInt;
+      ub_b_1 : DInt;
+      ub_b_2 : DInt;
+   END_VAR
+BEGIN
+	IF (NOT "Scheduler".tm_break) OR
+	   ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration :=
+	            1_000_000_000 +
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration :=
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    IF NOT "Scheduler".tm_break THEN
+	        #C[1,1] := #A[1,1] * #B[1,1];
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+END_FUNCTION
+
+
+FUNCTION "MatrixMulVal" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A   : Array[1..1, 1..1] of Real;
+      val : Real;
+   END_VAR
+   VAR_OUTPUT 
+      C : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+      status : Int;
+   END_VAR
+BEGIN
+	IF (NOT "Scheduler".tm_break) OR
+	   ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration :=
+	            1_000_000_000 +
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration :=
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    IF NOT "Scheduler".tm_break THEN
+	        #C[1,1] := #A[1,1] * #val;
+	    END_IF;
+	END_IF;
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+END_FUNCTION
+
+FUNCTION "MatrixSub" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[1..1, 1..1] of Real;
+      B : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_OUTPUT 
+      C : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+      status : Int;
+   END_VAR
+BEGIN
+	IF (NOT "Scheduler".tm_break) OR
+	   ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration :=
+	            1_000_000_000 +
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration :=
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    IF NOT "Scheduler".tm_break THEN
+	        #C[1,1] := #A[1,1] - #B[1,1];
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+END_FUNCTION
+
+
+FUNCTION "MatrixTranspose" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_OUTPUT 
+      C : Array[1..1, 1..1] of Real;
+   END_VAR
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+      status : Int;
+   END_VAR
+BEGIN
+	IF (NOT "Scheduler".tm_break) OR
+	   ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration :=
+	            1_000_000_000 +
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration :=
+	            "Scheduler".time_check.NANOSECOND -
+	            "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    IF NOT "Scheduler".tm_break THEN
+	        #C[1,1] := #A[1,1];
+	    END_IF;
+	END_IF;
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+END_FUNCTION
+
+
+FUNCTION "ScalarAssign" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      inVal : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      outVal : Real;
+   END_VAR
+
+   VAR_TEMP 
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 +
+	        "Scheduler".time_check.NANOSECOND -
+	        "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND -
+	        "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+
+		// assign value
+	    IF NOT "Scheduler".tm_break THEN
+	        #outVal := #inVal;
+	    END_IF;
+	END_IF;
+	
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+END_FUNCTION
+
+FUNCTION "ScalarLimit" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      input : Real;   // input value
+      min : Real;   // lower limit
+      max : Real;   // upper limit
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Real;   // limited output
+   END_VAR
+
+   VAR_TEMP 
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	// check scheduler state
+	IF (NOT "Scheduler".tm_break) OR
+	    ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    
+	    // resume after break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    // sync iteration flags
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    // compute duration
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration :=
+	        1_000_000_000 + "Scheduler".time_check.NANOSECOND -
+	        "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration :=
+	        "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    // timeout check
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    // saturation
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        #C := #input;
+	        
+	        IF #C > #max THEN
+	            #C := #max;
+	        ELSIF #C < #min THEN
+	            #C := #min;
+	        END_IF;
+	        
+	    END_IF;
+	    
+	END_IF;
+	
+	// increment global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+END_FUNCTION
+
+FUNCTION "ScalarRateLimit" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      input : Real;
+      last_value : Real;
+      max_delta : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Real;
+   END_VAR
+
+   VAR_TEMP 
+      delta : Real;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        #delta := #input - #last_value;
+	        
+	        IF #delta > #max_delta THEN
+	            #C := #last_value + #max_delta;
+	        ELSIF #delta < - #max_delta THEN
+	            #C := #last_value - #max_delta;
+	        ELSE
+	            #C := #input;
+	        END_IF;
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+END_FUNCTION
+
+FUNCTION "ScalarScale" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      input : Real;   // input value
+      a : Real;   // scale factor
+      b : Real;   // offset
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Real;   // scaled output
+   END_VAR
+
+   VAR_TEMP 
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	// check scheduler state
+	IF (NOT "Scheduler".tm_break) OR
+	    ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    
+	    // resume after break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	     // sync iteration flags
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    // read local time
+	    #status := RD_LOC_T("Scheduler".time_check);
+		
+		// compute duration
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration :=
+	        1_000_000_000 + "Scheduler".time_check.NANOSECOND -
+	        "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration :=
+	        "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    // timeout check
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    // linear scaling
+	    IF NOT "Scheduler".tm_break THEN
+	        #C := #a * #input + #b;
+	    END_IF;
+	    
+	END_IF;
+	
+	// increment global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+END_FUNCTION
+
+FUNCTION_BLOCK "RBF"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      x : Array[1..1, 1..1] of Real; // state vector
+      centers : Array[1..1, 1..4] of Real; // RBF centers
+      sigma : Array[1..1, 1..4] of Real; // RBF widths
+   END_VAR
+
+   VAR_OUTPUT 
+      phi : Array[1..4, 1..1] of Real; // basis outputs
+      Error : Bool; // error flag
+   END_VAR
+
+   VAR_TEMP 
+      i : Int; // center index
+      j : Int; // state index
+      diff : Real; // state difference
+      sum : Real; // squared distance
+      val : Real; // RBF value
+   END_VAR
+
+
+BEGIN
+	// loop over centers
+	FOR #i := 1 TO 4 DO
+	    #sum := 0.0;
+	    
+	    // compute squared distance
+	    FOR #j := 1 TO 1 DO
+	        #diff := #x[#j, 1] - #centers[#j, #i];
+	        #sum := #sum + #diff * #diff;
+	    END_FOR;
+	    
+	    // Gaussian activation
+	    // exp(-||x - c_i||² / (2σ²))
+	    #val := EXP(- #sum / (2.0 * #sigma[1, #i] * #sigma[1, #i]));
+
+		// store basis output
+	    #phi[#i, 1] := #val;
+	END_FOR;
+
+ 	// no error detected
+	#Error := FALSE;
+	
+END_FUNCTION_BLOCK
+
+FUNCTION "SchedulerInit" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      status : Int; // time read status
+   END_VAR
+
+
+BEGIN
+	// initialize scheduler timing
+	#status := RD_LOC_T("Scheduler".time_start);
+
+	// reset iteration counter
+	"Scheduler".flag_global := 0;
+	
+END_FUNCTION
+
+
+FUNCTION "MRAC_Update" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      Temp : Bool;
+      i : Int;
+      j : Int;
+      u : Array[1..1, 1..1] of Real; // control signal
+      e : Array[1..1, 1..1] of Real; // output error
+      BPex : Array[1..1, 1..1] of Real; // adaptation direction
+      pwm : Real; // PWM value
+      w_rads : Real;
+      T1 : Array[1..1, 1..1] of Real; // temp matrix
+      T2 : Array[1..1, 1..1] of Real; // temp matrix
+      T3 : Array[1..1, 1..1] of Real; // temp matrix
+      T4 : Array[1..1, 1..1] of Real; // temp matrix
+      kx_T : Array[1..1, 1..1] of Real; // transposed kx
+      w_T : Array[1..1, 1..6] of Real; // transposed w
+      temp1 : Array[1..1, 1..1] of Real; // temp result
+      temp2 : Array[1..1, 1..1] of Real; // temp result
+      temp3 : Array[1..1, 1..1] of Real; // temp result
+      temp4 : Array[1..1, 1..1] of Real; // temp result
+      U1x1 : Array[1..1, 1..1] of Real; // control matrix
+      ey : Array[1..1, 1..1] of Real; // output error
+      B_T : Array[1..1, 1..1] of Real; // transposed B
+   END_VAR
+
+
+BEGIN
+	// reference model
+	"MatrixMul"(A := "DB_MRAC".Am,
+	            B := "DB_MRAC".xm,
+	            C => #T1); //A*xm
+	"MatrixMul"(A := "DB_MRAC".Bm,
+	            B := "DB_MRAC".r,
+	            C => #T2); //Bm*r
+	"MatrixAdd"(A := #T1,
+	            B := #T2,
+	            C => "DB_MRAC".xm); //xm = A*xm + Bm*r
+	"MatrixMul"(A := "DB_MRAC".C,
+	            B := "DB_MRAC".xm,
+	            C => "DB_MRAC".ym); //ym = C*xm
+	
+	(* //"RBF" radial basis function to model nonlinearities (currently unused)
+	"RBF_DB"(x := "DB_MRAC".x,
+	         centers := "DB_MRAC".centers,
+	         sigma := "DB_MRAC".sigma,
+	         phi => "DB_MRAC".phi,
+	         Error => "DB_MRAC".Error);// *)
+	
+	//control law u = kr*r + kx^T*x - w^T*phi
+	"MatrixMul"(A := "DB_MRAC".r,
+	            B := "DB_MRAC".kr,
+	            C => #temp1);//kr*r
+	"MatrixTranspose"(A := "DB_MRAC".kx,
+	                  C => #kx_T); //kx^T
+	"MatrixMul"(A := #kx_T,
+	            B := "DB_MRAC".x,
+	            C => #temp2); //kx^T*x
+	(* "MatrixTranspose"(A := "DB_MRAC".w,
+	                  C => #w_T); //w^T
+	
+	"MatrixMul"(A := #w_T,
+	            B := "DB_MRAC".phi,
+	            C => #temp3); //w^T*phi *)
+	"MatrixAdd"(A := #temp1,
+	            B := #temp2,
+	            C => #u);//kr*r + kx^T
+	(* "MatrixSub"(A := #temp4,
+	            B := #temp3,
+	            C => #U1x1);//kr*r + kx^T*x - w^T*phi  *)
+	
+	(* //plant model (e.g. servodrive) - optional if you want to check MRAC with simulated plant 
+	"MatrixMul"(A := "DB_MRAC".A,
+	            B := "DB_MRAC".x,
+	            C => #T1); //A*x
+	"MatrixMul"(A := "DB_MRAC".B,
+	            B := #u,
+	            C => #T2); //B*u
+	(* "MatrixMul"(A := "DB_MRAC".G,
+	            B := #temp2,
+	            C => #T3); //G*w^T*phi *)
+	"MatrixAdd"(A := #T1,
+	            B := #T2,
+	            C => "DB_MRAC".x);//x=Ax+Bu
+	(* "MatrixAdd"(A := #T4,
+	            B := #T3,
+	            C => "DB_MRAC".x);//Ax+Bu+G*w^T*phi *)
+	"MatrixMul"(A := "DB_MRAC".C,
+	            B := "DB_MRAC".x,
+	            C => "DB_MRAC".y); //y=C*x
+	
+	(* //states error ex = x - xm
+	"MatrixSub"(A := "DB_MRAC".x,
+	            B := "DB_MRAC".xm,
+	            C => "DB_MRAC".ex); *) *)
+	
+	//output error
+	"MatrixSub"(A := "DB_MRAC".y,
+	            B := "DB_MRAC".ym,
+	            C => #e); // e = y - ym
+	
+	"MatrixAssign"(A := #e,
+	               C => "DB_MRAC".e); //e = dbmrac.e
+	
+	//adaptation direction B^T*P*ex
+	"MatrixTranspose"(A := "DB_MRAC".B,
+	                  C => #B_T); //B^T
+	
+	"MatrixMul"(A := "DB_MRAC".P,
+	            B := #e,
+	            C => #T1); //P*e
+	
+	"MatrixMul"(A := #B_T,
+	            B := #T1,
+	            C => #BPex); //B^T*P*e
+	
+	//adaption laws
+	//kr adaptation
+	"MatrixMul"(A := "DB_MRAC".r,
+	            B := #BPex,
+	            C => #T1);//r*BPex
+	
+	"MatrixMulVal"(A := #T1,
+	               val := "DB_MRAC".gamma_kr,
+	               C => #T2);//gamma_kr*r*BPex
+	
+	"MatrixSub"(A := "DB_MRAC".kr,
+	            B := #T2,
+	            C => "DB_MRAC".kr); //kr = kr - gamma_kr*r*BPex
+	
+	//kx adaptation
+	"MatrixMul"(A := "DB_MRAC".x,
+	            B := #BPex,
+	            C => #T1);//x*BPex
+	
+	"MatrixMulVal"(A := #T1,
+	               val := "DB_MRAC".gamma_kx,
+	               C => #T2);//gamma_kx*x*BPex
+	
+	"MatrixSub"(A := "DB_MRAC".kx,
+	            B := #T2,
+	            C => "DB_MRAC".kx); //kx = kx - gamma_kx*x*BPex
+	
+	//w adaptation (optional)
+	(* "MatrixMulVal"(A := "DB_MRAC".phi,
+	               val := #BPex,
+	               C => #T1);//phi*BPex
+	
+	"MatrixMulVal"(A := #T1,
+	               val := "DB_MRAC".gamma_w,
+	               C => #T2);//gamma_w*phi*BPex
+	
+	"MatrixSub"(A := "DB_MRAC".w,
+	            B := #T2,
+	            C => "DB_MRAC".w); //w = w - gamma_w*phi*BPex *)
+	
+	//sigma modification
+	//stabilization kr
+	"MatrixMulVal"(A := "DB_MRAC".kr,
+	               val := "DB_MRAC".sigma_mod,
+	               C => #T1);//sigma_mod*kr
+	
+	"MatrixSub"(A := "DB_MRAC".kr,
+	            B := #T1,
+	            C => "DB_MRAC".kr); //kr = kr - sigma_mod*kr
+
+	//stabilization kx
+	"MatrixMulVal"(A := "DB_MRAC".kx,
+	               val := "DB_MRAC".sigma_mod,
+	               C => #T1);//sigma_mod*kx
+	
+	"MatrixSub"(A := "DB_MRAC".kx,
+	            B := #T1,
+	            C => "DB_MRAC".kx); //kx = kx - sigma_mod*kx
+
+	//stabilization w (optional)
+	(* "MatrixMulVal"(A := "DB_MRAC".w,
+	               val := "DB_MRAC".sigma_mod,
+	               C => #T2);//sigma_mod*w
+	
+	"MatrixSub"(A := "DB_MRAC".w,
+	            B := #T2,
+	            C => "DB_MRAC".w); //w = w - sigma_mod*w *)
+
+    //limitations for kr and kx (optional)
+	(* "ScalarLimit"(input := "DB_MRAC".kr[1, 1],
+	              min := -10.0,
+	              max := 10.0,
+	              C => "DB_MRAC".kr[1, 1]);//ograniczenie dla kr
+	
+	"ScalarLimit"(input := "DB_MRAC".kx[1, 1],
+	              min := -10.0,
+	              max := 10.0,
+	              C => "DB_MRAC".kx[1, 1]);//ograniczenie dla kx *)
+	
+	//store control
+	"MatrixAssign"(A := #u,
+	               C => "DB_MRAC".u);
+
+	//PWM mapping
+	"MatrixMul"(A := #u,
+	            B := #u,
+	            C => #T1);//#u^2
+	
+	"MatrixMulVal"(A := #T1,
+	               val := -0.0000007197, //pwm quadratic coefficient
+	               C => #T2);//-0.0000007197*u^2
+	
+	"MatrixMulVal"(A := #u,
+	               val := -0.01371,
+	               C => #T3);//-0.01371*u
+	
+	"MatrixAdd"(A := #T2,
+	            B := #T3,
+	            C => #T4);//-0.0000007197*#u^2 - 0.01371*u
+	
+	"MatrixAddVal"(A := #T4,
+	               B := 24.319, //pwm offset
+	               C => #pwm);//-0.0000007197*#u^2 - 0.01371*u + 24.319
+
+	//PWM limits
+	"ScalarLimit"(input := #pwm,
+	              min := 4.0,
+	              max := 88.0,
+	              C => "DB_MRAC".pwm);
+
+	//rate limit
+	"ScalarRateLimit"(input := "DB_MRAC".pwm,
+	                  last_value := "DB_MRAC".last_pwm,
+	                  max_delta := "DB_MRAC".max_delta_pwm,
+	                  C => "DB_MRAC".pwm);
+	
+	//store PWM
+	"ScalarAssign"(inVal := "DB_MRAC".pwm,
+	               outVal => "DB_MRAC".last_pwm);
+
+END_FUNCTION
+
+ORGANIZATION_BLOCK "MRAC_Execute"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+BEGIN
+	
+	IF "run_test" THEN //start MRAC control loop
+		//speed measurement scaling
+	    "DB_MRAC".x[1, 1] := (-0.02971 * INT_TO_REAL(WORD_TO_INT("Tacho")) - 180.2) * (2.0 * 3.14159 / 4096.0) * (1.0 / 0.02);
+	    
+		//measured output
+		"DB_MRAC".y[1, 1] := "DB_MRAC".x[1, 1];
+
+		//MRAC Execution
+	    IF NOT "Scheduler".tm_break THEN
+	        "MRAC_Update"();
+	    ELSE
+	        "SchedulerInit"(); //reset scheduler
+	    END_IF;
+
+		//PWM to output
+	    "procentPWM" := REAL_TO_INT("DB_MRAC".pwm);
+	    
+	    //example reference step changes	    
+	    IF "counter" = 1500 THEN
+	        "DB_MRAC".r[1, 1] := 20.0;
+	    END_IF;
+	    
+	    IF "counter" = 3000 THEN
+	        "DB_MRAC".r[1, 1] := 15.0;
+	    END_IF;
+
+		//iteration counter
+	    "counter" := "counter" + 1;
+
+		//logging data from simulation to Data Block 
+	    "Data".r["licznik"] := "DB_MRAC".r[1, 1];
+	    "Data".y["counter"] := "DB_MRAC".y[1, 1];
+	    "Data".ym["counter"] := "DB_MRAC".ym[1, 1];
+	    "Data".u["licznik"] := "DB_MRAC".u[1, 1];
+	    "Data".pwm["licznik"] :="DB_MRAC".pwm;
+	    "Data".kr["licznik"] := "DB_MRAC".kr[1, 1];
+	    "Data".kx["licznik"] := "DB_MRAC".kx[1, 1];
+
+		//stop condition of simulation
+	    IF "counter" >= 5000 THEN
+	        "counter" := 0;
+	        "run_test" := FALSE;
+	        "DB_MRAC".r[1, 1] := 0.0;
+	        "procentPWM" := 0.0;
+	    END_IF;
+	    
+	ELSE
+	    "SchedulerInit"();
+	END_IF;
+	
+	// scheduler handling
+	IF "Scheduler".tm_break THEN
+	    "scheduler_counter" := "scheduler_counter" + 1; // break counter
+	    "SchedulerInit"();                                 // reset timing
+	    "Scheduler".tm_break := FALSE;                     // reset flag
+	END_IF;
+	
+END_ORGANIZATION_BLOCK
+
+//data block containing all MRAC parameters, states and signals
+DATA_BLOCK "DB_MRAC"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      Am : Array[1..1, 1..1] of Real; //reference model Am
+      Bm { S7_SetPoint := 'True'} : Array[1..1, 1..1] of Real; //reference model Bm
+      C { S7_SetPoint := 'True'} : Array[1..1, 1..1] of Real; //output matrix
+      A { S7_SetPoint := 'True'} : Array[1..1, 1..1] of Real; //plant A matrix
+      B { S7_SetPoint := 'True'} : Array[1..1, 1..1] of Real; //plant B matrix
+      P { S7_SetPoint := 'True'} : Array[1..1, 1..1] of Real; //Lyapunov matrix
+      x { S7_SetPoint := 'True'} : Array[1..1, 1..1] of Real; //plant state
+      xm { S7_SetPoint := 'True'} : Array[1..1, 1..1] of Real; //model state
+      ex { S7_SetPoint := 'True'} : Array[1..1, 1..1] of Real; //state error
+      r : Array[1..1, 1..1] of Real; //reference
+      y { S7_SetPoint := 'True'} : Array[1..1, 1..1] of Real; //plant output
+      ym : Array[1..1, 1..1] of Real; //model reference output
+      u : Array[1..1, 1..1] of Real; //control signal
+      e : Array[1..1, 1..1] of Real; //output error
+      kx : Array[1..1, 1..1] of Real; //adaptive gain kx
+      kr : Array[1..1, 1..1] of Real; //adaptive gain kr
+      w : Array[1..4, 1..1] of Real; //adaptive RBF gains w
+      phi { S7_SetPoint := 'True'} : Array[1..4, 1..1] of Real; //RBF outputs
+      centers { S7_SetPoint := 'True'} : Array[1..1, 1..4] of Real; //RBF centers
+      sigma { S7_SetPoint := 'True'} : Array[1..1, 1..4] of Real; //RBF widths
+      gamma_kx { S7_SetPoint := 'True'} : Real; //kx adaptation rate
+      gamma_kr { S7_SetPoint := 'True'} : Real; //kr adaptation rate
+      gamma_w : Real; //w adaptation rate
+      Error : Bool; //RBF error flag
+      G : Array[1..1, 1..1] of Real; //nonlinear gain
+      sigma_mod : Real; //sigma modification coefficient
+      pwm : Real; //pwm output
+      last_pwm : Real; //previous pwm value
+      max_delta_pwm : Real; //PWM rate limit
+   END_VAR
+
+
+BEGIN
+   Am[1,1] := 0.97;
+   Bm[1,1] := 0.03;
+   C[1,1] := 1.0;
+   A[1,1] := 0.98575;
+   B[1,1] := 0.006422;
+   P[1,1] := 16.9205;
+   r[1,1] := 5.0;
+   kr[1,1] := 1.0;
+   centers[1,2] := 10.0;
+   centers[1,3] := 20.0;
+   centers[1,4] := 30.0;
+   sigma[1,1] := 10.0;
+   sigma[1,2] := 10.0;
+   sigma[1,3] := 10.0;
+   sigma[1,4] := 10.0;
+   gamma_kx := 1.0;
+   gamma_kr := 2.5;
+   gamma_w := 0.001;
+   G[1,1] := 1.0;
+   sigma_mod := 0.0001;
+   max_delta_pwm := 20.0;
+
+END_DATA_BLOCK

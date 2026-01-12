@@ -548,17 +548,24 @@ NON_RETAIN
       Temp7 : Array[1..2, 1..2] of Real;   // pxp
       Temp8 : Array[1..2, 1..2] of Real;   // pxp
       Temp10 : Array[1..2, 1..1] of Real;   // px1
+      Temp11 : Array[1..3, 1..1] of Real;   // nx1
+      Temp12 : Array[1..3, 1..1] of Real;   // nx1
       A : Array[1..3, 1..3] of Real;   // nxn
       Q : Array[1..3, 1..3] of Real;   // nxn
       R : Array[1..2, 1..2] of Real;   // pxp
       C : Array[1..2, 1..3] of Real;   // pxn
+      B : Array[1..3, 1..1] of Real;   // nxm
       x_pred : Array[1..3, 1..1] of Real;   // nx1
       y : Array[1..2, 1..1] of Real;   // px1
       y_est : Array[1..2, 1..1] of Real;   // px1
+      u : Array[1..1, 1..1] of Real;   // mx1
    END_VAR
 
 
 BEGIN
+   P[1,1] := 1.0;
+   P[2,2] := 1.0;
+   P[3,3] := 1.0;
    G[1,1] := 1.0;
    G[2,2] := 1.0;
    G[3,3] := 1.0;
@@ -575,11 +582,24 @@ FUNCTION "Kalman_Filter" : Void
 VERSION : 0.1
 
 BEGIN
+	//important to set A, B, C, u, y prior to use of the function
+	//y_est/x_est are the estimates
 	"MatrixIdentity"(lb := 1,
 	                 ub := 3,
 	                 C => "Kalman_Filter_DB".I);
-	//1. predykcja kowariancji błędu
-	//pierwszy składnik
+	//0. state prediction
+	"MatrixMul"(A := "Kalman_Filter_DB".A,
+	            B := "Kalman_Filter_DB".x_pred,
+	            C => "Kalman_Filter_DB".Temp11);
+	"MatrixMul"(A := "Kalman_Filter_DB".B,
+	            B := "Kalman_Filter_DB".u,
+	            C => "Kalman_Filter_DB".Temp12);
+	"MatrixAdd"(A := "Kalman_Filter_DB".Temp11,
+	            B := "Kalman_Filter_DB".Temp12,
+	            C => "Kalman_Filter_DB".x_pred);
+	
+	//1. error covariance matrix prediction
+	//first part
 	"MatrixTranspose"(A := "Kalman_Filter_DB".A,
 	                  C => "Kalman_Filter_DB".Temp1);
 	"MatrixMul"(A := "Kalman_Filter_DB".A,
@@ -588,7 +608,7 @@ BEGIN
 	"MatrixMul"(A := "Kalman_Filter_DB".Temp2,
 	            B := "Kalman_Filter_DB".Temp1,
 	            C => "Kalman_Filter_DB".Temp3);
-	//drugi składnik
+	//second part
 	"MatrixTranspose"(A := "Kalman_Filter_DB".G,
 	                  C => "Kalman_Filter_DB".Temp1);
 	"MatrixMul"(A := "Kalman_Filter_DB".G,
@@ -597,13 +617,13 @@ BEGIN
 	"MatrixMul"(A := "Kalman_Filter_DB".Temp2,
 	            B := "Kalman_Filter_DB".Temp1,
 	            C => "Kalman_Filter_DB".Temp4);
-	//suma
+	//sum
 	"MatrixAdd"(A := "Kalman_Filter_DB".Temp3,
 	            B := "Kalman_Filter_DB".Temp4,
 	            C => "Kalman_Filter_DB".P);
 	
-	//2. obliczenie wzmocnienia Kalmana
-	//wnętrze inwersji
+	//2. Kalman filter gain
+	//iversion inner
 	"MatrixTranspose"(A := "Kalman_Filter_DB".C,
 	                  C => "Kalman_Filter_DB".Temp5);
 	"MatrixMul"(A := "Kalman_Filter_DB".C,
@@ -617,7 +637,7 @@ BEGIN
 	            C => "Kalman_Filter_DB".Temp7);
 	"MatrixInvert"(A := "Kalman_Filter_DB".Temp7,
 	               C => "Kalman_Filter_DB".Temp8);
-	//mnożenie
+	//mul
 	"MatrixMul"(A := "Kalman_Filter_DB".P,
 	            B := "Kalman_Filter_DB".Temp5,
 	            C => "Kalman_Filter_DB".Temp9);
@@ -625,7 +645,7 @@ BEGIN
 	            B := "Kalman_Filter_DB".Temp8,
 	            C => "Kalman_Filter_DB".K);
 	
-	//3. aktualizacja estymaty na podstawie y
+	//3. estimate update
 	//
 	"MatrixMul"(A := "Kalman_Filter_DB".C,
 	            B := "Kalman_Filter_DB".x_pred,
@@ -635,12 +655,13 @@ BEGIN
 	            C => "Kalman_Filter_DB".Temp10);
 	"MatrixMul"(A := "Kalman_Filter_DB".K,
 	            B := "Kalman_Filter_DB".Temp10,
-	            C => "Kalman_Filter_DB".x_est);
+	            C => "Kalman_Filter_DB".Temp11);
 	"MatrixAdd"(A := "Kalman_Filter_DB".x_pred,
-	            B := "Kalman_Filter_DB".x_est,
-	            C => "Kalman_Filter_DB".x_est);
+	            B := "Kalman_Filter_DB".Temp11,
+	            C => "Kalman_Filter_DB".x_pred);
+	"Kalman_Filter_DB".x_est := "Kalman_Filter_DB".x_pred;
 	
-	//4. aktualizacja kowariancji błędu
+	//4. error covariance matrix update
 	
 	"MatrixMul"(A := "Kalman_Filter_DB".K,
 	            B := "Kalman_Filter_DB".C,
@@ -652,29 +673,95 @@ BEGIN
 	                  C => "Kalman_Filter_DB".Temp1);
 	"MatrixTranspose"(A := "Kalman_Filter_DB".K,
 	                  C => "Kalman_Filter_DB".Temp6);
-	//lewy składnik z joseph formą
+	//joseph form first part
 	"MatrixMul"(A := "Kalman_Filter_DB".Temp2,
 	            B := "Kalman_Filter_DB".P,
 	            C => "Kalman_Filter_DB".Temp3);
 	"MatrixMul"(A := "Kalman_Filter_DB".Temp3,
 	            B := "Kalman_Filter_DB".Temp1,
 	            C => "Kalman_Filter_DB".P);
-	//prawy składnik
+	//second part
 	"MatrixMul"(A := "Kalman_Filter_DB".K,
 	            B := "Kalman_Filter_DB".R,
 	            C => "Kalman_Filter_DB".Temp9);
 	"MatrixMul"(A := "Kalman_Filter_DB".Temp9,
 	            B := "Kalman_Filter_DB".Temp6,
 	            C => "Kalman_Filter_DB".Temp1);
-	//suma
+	//sum
 	"MatrixAdd"(A := "Kalman_Filter_DB".P,
 	            B := "Kalman_Filter_DB".Temp1,
 	            C => "Kalman_Filter_DB".P);
 	
-	
+	//y estimate
 	"MatrixMul"(A := "Kalman_Filter_DB".C,
 	            B := "Kalman_Filter_DB".x_est,
 	            C => "Kalman_Filter_DB".y_est);
+END_FUNCTION
+
+FUNCTION "MatrixAddVal" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      val : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	//if rhere is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        #lb_1 := LOWER_BOUND(ARR := #A, DIM := 1);
+	        #lb_2 := LOWER_BOUND(ARR := #A, DIM := 2);
+	        #ub_1 := UPPER_BOUND(ARR := #A, DIM := 1);
+	        #ub_2 := UPPER_BOUND(ARR := #A, DIM := 2);
+	        FOR #i := #lb_1 TO #ub_1 DO
+	            FOR #j := #lb_2 TO #ub_2 DO
+	                #C[#i, #j] := #A[#i, #j] + #val;
+	            END_FOR;
+	        END_FOR;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
 END_FUNCTION
 
 FUNCTION "MatrixConcat" : Void
@@ -775,72 +862,6 @@ BEGIN
 	        ELSE
 	            RETURN;
 	        END_IF;
-	    END_IF;
-	END_IF;
-	//iterate global flag
-	"Scheduler".flag_global := "Scheduler".flag_global + 1;
-	
-END_FUNCTION
-
-FUNCTION "MatrixAddVal" : Void
-{ S7_Optimized_Access := 'TRUE' }
-VERSION : 0.1
-   VAR_INPUT 
-      A : Array[*, *] of Real;
-      val : Real;
-   END_VAR
-
-   VAR_OUTPUT 
-      C : Array[*, *] of Real;
-   END_VAR
-
-   VAR_TEMP 
-      i : DInt;
-      j : DInt;
-      lb_1 : DInt;
-      lb_2 : DInt;
-      ub_1 : DInt;
-      ub_2 : DInt;
-      status : Int;
-   END_VAR
-
-
-BEGIN
-	//if rhere is no break or this is the correct function
-	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
-	    //correct function -> cancel the break
-	    IF "Scheduler".tm_break THEN
-	        "Scheduler".tm_break := FALSE;
-	    END_IF;
-	    
-	    //local flag = global flag
-	    "Scheduler".flag_iter := "Scheduler".flag_global;
-	    
-	    //time check
-	    #status := RD_LOC_T("Scheduler".time_check);
-	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
-	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
-	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
-	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
-	    END_IF;
-	    
-	    //if computation time is too long then make a break
-	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
-	        "Scheduler".tm_break := TRUE;
-	    END_IF;
-	    
-	    //if there is no break - compute normally
-	    IF NOT "Scheduler".tm_break THEN
-	        
-	        #lb_1 := LOWER_BOUND(ARR := #A, DIM := 1);
-	        #lb_2 := LOWER_BOUND(ARR := #A, DIM := 2);
-	        #ub_1 := UPPER_BOUND(ARR := #A, DIM := 1);
-	        #ub_2 := UPPER_BOUND(ARR := #A, DIM := 2);
-	        FOR #i := #lb_1 TO #ub_1 DO
-	            FOR #j := #lb_2 TO #ub_2 DO
-	                #C[#i, #j] := #A[#i, #j] + #val;
-	            END_FOR;
-	        END_FOR;
 	    END_IF;
 	END_IF;
 	//iterate global flag
