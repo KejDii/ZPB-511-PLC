@@ -11,6 +11,9 @@ $$
 \end{aligned} \tag{1}
 $$
 
+---
+
+### References
 [1] R.  E.  Kalman,  “A  New  Approach  to  Linear  Filtering  and  PredictionProblems,”Journal  of  Basic  Engineering,  vol.  82,  no.  1,  pp.  35–45,Mar. 1960. [Online]. Available: https://asmedigitalcollection.asme.org/fluidsengineering/article-abstract/82/1/35/397706/A-New-Approach-to-Linear-Filtering-and-Prediction
 [2] P.   A.   M.   and   N.   Wiener,   “The   Extrapolation,   Interpolation   andSmoothing  of  Stationary  Time  Series,  with  Engineering  Applications.”Journal  of  the  Royal  Statistical  Society.  Series  A  (General),  vol.  113,no.  3,  p.  413,  1950.  [Online].  Available:  https://www.jstor.org/stable/10.2307/2981007?origin=crossref
 [3] R.  S.  Bucy  and  P.  D.  Joseph, Filtering  for  stochastic  processes  withapplications  to  guidance,  ser.  Interscience  tracts  in  pure  and  appliedmathematics.    New York: Interscience Publ, 1968, no. 23.
