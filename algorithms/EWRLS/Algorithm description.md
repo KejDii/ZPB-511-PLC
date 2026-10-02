@@ -1,4 +1,4 @@
-For the purpose of testing an estimation algorithm, the EWRLS (Equally Weighted Recursive Least Squares) algorithm was implemented using SCL and LAD. It utilizes the regression vector $\bm{\varphi}^{T}(i)$ constructed each iteration $i$ based on $\bm{u}^{T}$ and $\bm{y}^{T}$, which are the input and output vectors respectively. The aforementioned data is used to create an ARX model in the following form: 
+For the purpose of testing an estimation algorithm, the EWRLS (Equally Weighted Recursive Least Squares) algorithm was implemented using SCL and LAD. It utilizes the regression vector $\boldsymbol{\varphi}^{T}(i)$ constructed each iteration $i$ based on $\boldsymbol{u}^{T}$ and $\boldsymbol{y}^{T}$, which are the input and output vectors respectively. The aforementioned data is used to create an ARX model in the following form: 
 
 $$
 y(i) = \sum_{j = 1}^{r} a_{j}y(i-j) + \sum_{j = 1}^{q} b_{j}u(i-j) + n_{m}(i) \text{,}
@@ -8,10 +8,10 @@ where $n_{m}(i)$ is the measurement noise. The algorithm itself is performed usi
 
 $$
 \begin{aligned}
-\varepsilon(i) &= y(i)-\bm{\varphi}^{T}(i)\hat{\bm{\theta}}(i-1) \\
-\bm{k}(i) &= \frac{\bm{P}(i-1)\bm{\varphi}(i)}{\lambda+\bm{\varphi}^{T}(i)\bm{P}(i-1)\bm{\varphi}(i)} \\
-\hat{\bm{\theta}}(i) &= \hat{\bm{\theta}}(i-1) + \bm{k}(i)\varepsilon(i) \\
-\bm{P}(i) &= \frac{1}{\lambda} \left(\bm{P}(i-1) - \bm{k}(i)\bm{\varphi}^{T}(i)\bm{P}(i-1) \right) \text{.}
+\varepsilon(i) &= y(i)-\boldsymbol{\varphi}^{T}(i)\hat{\boldsymbol{\theta}}(i-1) \\
+\boldsymbol{k}(i) &= \frac{\boldsymbol{P}(i-1)\boldsymbol{\varphi}(i)}{\lambda+\boldsymbol{\varphi}^{T}(i)\boldsymbol{P}(i-1)\boldsymbol{\varphi}(i)} \\
+\hat{\boldsymbol{\theta}}(i) &= \hat{\boldsymbol{\theta}}(i-1) + \boldsymbol{k}(i)\varepsilon(i) \\
+\boldsymbol{P}(i) &= \frac{1}{\lambda} \left(\boldsymbol{P}(i-1) - \boldsymbol{k}(i)\boldsymbol{\varphi}^{T}(i)\boldsymbol{P}(i-1) \right) \text{.}
 \end{aligned}
 $$
 
